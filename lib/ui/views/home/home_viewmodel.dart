@@ -1,36 +1,47 @@
-import 'package:divine_stream/app/app.bottomsheets.dart';
-import 'package:divine_stream/app/app.dialogs.dart';
-import 'package:divine_stream/app/app.locator.dart';
-import 'package:divine_stream/ui/common/app_strings.dart';
+import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 class HomeViewModel extends BaseViewModel {
-  final _dialogService = locator<DialogService>();
-  final _bottomSheetService = locator<BottomSheetService>();
 
-  String get counterLabel => 'Counter is: $_counter';
 
-  int _counter = 0;
+  /// Initializes the home screen.
+  /// - Loads cached playlists (if any) and then refreshes them from Google Drive.
+  Future<void> initialize() async {
 
-  void incrementCounter() {
-    _counter++;
-    rebuildUi();
   }
 
-  void showDialog() {
-    _dialogService.showCustomDialog(
-      variant: DialogType.infoAlert,
-      title: 'Stacked Rocks!',
-      description: 'Give stacked $_counter stars on Github',
+
+  /// Refreshes all playlists (re-syncs from Google Drive)
+  Future<void> refreshAllPlaylists() async {
+
+  }
+
+  /// Prompts user to paste a folder link and imports it
+  Future<void> importFromGoogleDriveFolder() async {
+    final controller = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: StackedService.navigatorKey!.currentContext!,
+      builder: (context) => AlertDialog(
+        title: Text("Import Playlist"),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: "Paste folder link here"),
+        ),
+        actions: [
+          TextButton(
+            child: Text("Cancel"),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: Text("Import"),
+            onPressed: () => Navigator.of(context).pop(controller.text),
+          ),
+        ],
+      ),
     );
+
   }
 
-  void showBottomSheet() {
-    _bottomSheetService.showCustomSheet(
-      variant: BottomSheetType.notice,
-      title: ksHomeBottomSheetTitle,
-      description: ksHomeBottomSheetDescription,
-    );
-  }
 }
