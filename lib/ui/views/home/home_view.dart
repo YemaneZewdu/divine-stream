@@ -15,12 +15,10 @@ class HomeView extends StackedView<HomeViewModel> {
               actions: [
                 IconButton(
                     icon: Icon(Icons.refresh),
-                    onPressed: () => viewModel.refreshAllPlaylists()
-                ),
+                    onPressed: () => viewModel.refreshAllPlaylists()),
               ],
             ),
-            body:
-            const Center(
+            body: const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
