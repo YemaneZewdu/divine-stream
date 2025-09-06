@@ -66,4 +66,9 @@ class HomeViewModel extends BaseViewModel {
     }
     setBusy(false);
   }
+
+  /// Navigates to playlist view
+  void openPlaylist(Playlist playlist) {
+  }
+
 }

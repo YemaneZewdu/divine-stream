@@ -15,10 +15,14 @@ class HomeView extends StackedView<HomeViewModel> {
               actions: [
                 IconButton(
                     icon: Icon(Icons.refresh),
-                    onPressed: () => viewModel.refreshAllPlaylists()),
+                    onPressed: () => viewModel.refreshAllPlaylists()
+                ),
               ],
             ),
-            body: const Center(
+            body: viewModel.isBusy
+                ? Center(child: CircularProgressIndicator())
+                : viewModel.playlists.isEmpty
+                ? const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
                 child: Text(
@@ -27,6 +31,18 @@ class HomeView extends StackedView<HomeViewModel> {
                   style: TextStyle(fontSize: 16),
                 ),
               ),
+            )
+                : ListView.builder(
+              itemCount: viewModel.playlists.length,
+              itemBuilder: (context, index) {
+                final playlist = viewModel.playlists[index];
+                return ListTile(
+                  title: Text(playlist.name),
+                  subtitle: Text(
+                      "${playlist.audioFiles.length} audio files"),
+                  onTap: () => viewModel.openPlaylist(playlist),
+                );
+              },
             ),
             floatingActionButton: FloatingActionButton(
               onPressed: viewModel.importFromGoogleDriveFolder,
