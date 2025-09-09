@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/audio_file.dart';
 import '../models/playlist.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GoogleDriveService {
 
-  final api_key = "AIzaSyCEvTZQRCj8Gc2-y6NIAJVh2Y8mI4FVipY";
+  final api_key = dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
 
   /// Fetch direct subfolders under a given parent folder
   Future<List<Map<String, dynamic>>> fetchSubFolders(
