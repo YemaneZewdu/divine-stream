@@ -4,6 +4,8 @@ import 'package:divine_stream/ui/views/home/home_view.dart';
 import 'package:divine_stream/ui/views/startup/startup_view.dart';
 import 'package:stacked/stacked_annotations.dart';
 import 'package:stacked_services/stacked_services.dart';
+import 'package:divine_stream/services/playlist_service.dart';
+import 'package:divine_stream/services/google_drive_service.dart';
 // @stacked-import
 
 @StackedApp(
@@ -16,7 +18,9 @@ import 'package:stacked_services/stacked_services.dart';
     LazySingleton(classType: BottomSheetService),
     LazySingleton(classType: DialogService),
     LazySingleton(classType: NavigationService),
-    // @stacked-service
+    LazySingleton(classType: PlaylistService),
+    LazySingleton(classType: GoogleDriveService),
+// @stacked-service
   ],
   bottomsheets: [
     StackedBottomsheet(classType: NoticeSheet),

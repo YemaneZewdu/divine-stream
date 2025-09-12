@@ -1,85 +1,63 @@
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
-import 'package:divine_stream/ui/common/app_colors.dart';
-import 'package:divine_stream/ui/common/ui_helpers.dart';
-
 import 'home_viewmodel.dart';
 
 class HomeView extends StackedView<HomeViewModel> {
-  const HomeView({Key? key}) : super(key: key);
-
   @override
-  Widget builder(
-    BuildContext context,
-    HomeViewModel viewModel,
-    Widget? child,
-  ) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 25.0),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.max,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                verticalSpaceLarge,
-                Column(
-                  children: [
-                    const Text(
-                      'Hello, STACKED!',
-                      style: TextStyle(
-                        fontSize: 35,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    verticalSpaceMedium,
-                    MaterialButton(
-                      color: Colors.black,
-                      onPressed: viewModel.incrementCounter,
-                      child: Text(
-                        viewModel.counterLabel,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ],
+  Widget builder(BuildContext context, HomeViewModel viewModel, Widget? child) {
+    return ViewModelBuilder<HomeViewModel>.reactive(
+      viewModelBuilder: () => HomeViewModel(),
+      onViewModelReady: (viewModel) => viewModel.initialize(),
+      builder: (context, viewModel, child) {
+        return Scaffold(
+            appBar: AppBar(
+              title: Text("Divine Audio Streaming"),
+              actions: [
+                IconButton(
+                    icon: Icon(Icons.refresh),
+                    onPressed: () => viewModel.refreshAllPlaylists()
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    MaterialButton(
-                      color: kcDarkGreyColor,
-                      onPressed: viewModel.showDialog,
-                      child: const Text(
-                        'Show Dialog',
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    MaterialButton(
-                      color: kcDarkGreyColor,
-                      onPressed: viewModel.showBottomSheet,
-                      child: const Text(
-                        'Show Bottom Sheet',
-                        style: TextStyle(
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
               ],
             ),
-          ),
-        ),
-      ),
+            body: viewModel.isBusy
+                ? Center(child: CircularProgressIndicator())
+                : viewModel.playlists.isEmpty
+                ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  "No playlists yet.\nTap + to import from Google Drive.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+              ),
+            )
+                : ListView.builder(
+              itemCount: viewModel.playlists.length,
+              itemBuilder: (context, index) {
+                final playlist = viewModel.playlists[index];
+                return ListTile(
+                  title: Text(playlist.name),
+                  subtitle: Text(
+                      "${playlist.audioFiles.length} audio files"),
+                  onTap: () => viewModel.openPlaylist(playlist),
+                );
+              },
+            ),
+            floatingActionButton: FloatingActionButton(
+              onPressed: viewModel.importFromGoogleDriveFolder,
+              child: Icon(Icons.add),
+            ));
+      },
     );
   }
 
   @override
-  HomeViewModel viewModelBuilder(
-    BuildContext context,
-  ) =>
-      HomeViewModel();
+  HomeViewModel viewModelBuilder(BuildContext context) => HomeViewModel();
+
+  @override
+  void onViewModelReady(HomeViewModel viewModel) {
+    viewModel.initialize();
+    super.onViewModelReady(viewModel);
+  }
 }

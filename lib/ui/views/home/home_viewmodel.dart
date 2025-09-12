@@ -1,36 +1,74 @@
-import 'package:divine_stream/app/app.bottomsheets.dart';
-import 'package:divine_stream/app/app.dialogs.dart';
 import 'package:divine_stream/app/app.locator.dart';
-import 'package:divine_stream/ui/common/app_strings.dart';
+import 'package:divine_stream/helpers/app_helpers.dart';
+import 'package:divine_stream/models/playlist.dart';
+import 'package:divine_stream/services/playlist_service.dart';
+import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
 
 class HomeViewModel extends BaseViewModel {
-  final _dialogService = locator<DialogService>();
-  final _bottomSheetService = locator<BottomSheetService>();
+  final PlaylistService _playlistService = locator<PlaylistService>();
 
-  String get counterLabel => 'Counter is: $_counter';
+  /// Initializes the home screen.
+  /// - Loads cached playlists (if any) and then refreshes them from Google Drive.
+  Future<void> initialize() async {}
 
-  int _counter = 0;
+  List<Playlist> playlists = [];
 
-  void incrementCounter() {
-    _counter++;
-    rebuildUi();
-  }
+  /// Refreshes all playlists (re-syncs from Google Drive)
+  Future<void> refreshAllPlaylists() async {}
 
-  void showDialog() {
-    _dialogService.showCustomDialog(
-      variant: DialogType.infoAlert,
-      title: 'Stacked Rocks!',
-      description: 'Give stacked $_counter stars on Github',
+  /// Prompts user to paste a folder link and imports it
+  Future<void> importFromGoogleDriveFolder() async {
+    final controller = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: StackedService.navigatorKey!.currentContext!,
+      builder: (context) => AlertDialog(
+        title: Text("Import Playlist"),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(hintText: "Paste folder link here"),
+        ),
+        actions: [
+          TextButton(
+            child: Text("Cancel"),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: Text("Import"),
+            onPressed: () => Navigator.of(context).pop(controller.text),
+          ),
+        ],
+      ),
     );
+
+    if (result == null || result.trim().isEmpty) return;
+
+    final folderId = Helpers.extractFolderIdFromUrl(result.trim());
+    if (folderId == null) {
+      Helpers.showToast(
+        "Invalid folder link.",
+      );
+      return;
+    }
+
+    setBusy(true);
+    try {
+      final newPlaylists =
+          await _playlistService.importNestedPlaylists(folderId);
+      playlists.addAll(newPlaylists);
+      notifyListeners();
+      Helpers.showToast( "Playlist(s) imported!");
+    } catch (e) {
+      Helpers.showToast( "Import failed: ${Helpers.shorten(e.toString())}");
+
+    }
+    setBusy(false);
   }
 
-  void showBottomSheet() {
-    _bottomSheetService.showCustomSheet(
-      variant: BottomSheetType.notice,
-      title: ksHomeBottomSheetTitle,
-      description: ksHomeBottomSheetDescription,
-    );
+  /// Navigates to playlist view
+  void openPlaylist(Playlist playlist) {
   }
+
 }
