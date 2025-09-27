@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/app/app.router.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
@@ -20,7 +22,21 @@ class HomeViewModel extends BaseViewModel {
   List<Playlist> playlists = [];
 
   /// Refreshes all playlists (re-syncs from Google Drive)
-  Future<void> refreshAllPlaylists() async {}
+  Future<void> refreshAllPlaylists() async {
+    log("\n in refreshAllPlaylists\n ");
+    setBusy(true);
+    try {
+      final updated = await _playlistService.refreshAll();
+      playlists = updated;
+      notifyListeners();
+      Helpers.showToast("Playlists refreshed", backgroundColor: Colors.green);
+    } catch (e) {
+      log(e.toString());
+      Helpers.showToast("Error refreshing playlists: ${Helpers.shorten(e.toString())}");
+
+    }
+    setBusy(false);
+  }
 
   /// Prompts user to paste a folder link and imports it
   Future<void> importFromGoogleDriveFolder() async {

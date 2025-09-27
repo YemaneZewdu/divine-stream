@@ -1,6 +1,9 @@
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/google_drive_service.dart';
+import 'package:divine_stream/utils/sort_audio_files.dart';
 import 'package:hive/hive.dart';
+
+import '../models/audio_file.dart';
 
 class PlaylistService {
   final GoogleDriveService _googleDriveService;
@@ -37,5 +40,33 @@ class PlaylistService {
     final updated = [...current, ...nestedPlaylists];
     await _savePlaylists(updated);
     return nestedPlaylists;
+  }
+
+  /// Refreshes all playlists by re-fetching their contents from Drive
+  Future<List<Playlist>> refreshAll() async {
+    final current = getCachedPlaylists();
+    final refreshed = <Playlist>[];
+
+    for (final playlist in current) {
+      final rawFiles = await _googleDriveService.fetchAudioFiles(playlist.id);
+
+      // 1 Decode into AudioFile
+      final files = rawFiles
+          .map((m) => AudioFile.fromJson(m))
+          .toList();
+
+      // 2 Sort with your comparator
+      files.sort(audioFileComparator);
+
+      // 3 Build the updated Playlist
+      refreshed.add(Playlist(
+        id: playlist.id,
+        name: playlist.name,
+        audioFiles: files,
+      ));
+    }
+
+    await _savePlaylists(refreshed);
+    return refreshed;
   }
 }
