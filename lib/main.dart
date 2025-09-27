@@ -1,3 +1,5 @@
+import 'package:audio_service/audio_service.dart';
+import 'package:divine_stream/services/audio_handler_impl_service.dart';
 import 'package:flutter/material.dart';
 import 'package:divine_stream/app/app.bottomsheets.dart';
 import 'package:divine_stream/app/app.dialogs.dart';
@@ -8,7 +10,6 @@ import 'package:stacked_services/stacked_services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
-
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
@@ -19,6 +20,21 @@ Future<void> main() async {
 
   // Open the box for storing playlists
   await Hive.openBox('playlistsBox');
+
+  // Init AudioService (background playback and lock screen control)
+  final handler = await AudioService.init(
+    builder: () => AudioHandlerImplService(),
+    config: AudioServiceConfig(
+      androidNotificationChannelId: 'com.audio_streaming_app.channel.audio',
+      androidNotificationChannelName: 'Audio Playback',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      preloadArtwork: true,
+    ),
+  );
+
+  // Register manually before other services
+  locator.registerSingleton<AudioHandler>(handler);
 
   await setupLocator();
   setupDialogUi();

@@ -25,19 +25,17 @@ class PlaylistService {
   /// Save playlists to Hive
   Future<void> _savePlaylists(List<Playlist> playlists) async {
     List<Map<String, dynamic>> jsonData =
-    playlists.map((playlist) => playlist.toJson()).toList();
+        playlists.map((playlist) => playlist.toJson()).toList();
     await _box.put('playlists', jsonData);
   }
 
   /// Imports all subfolders with audio files under a root folder
   Future<List<Playlist>> importNestedPlaylists(String rootFolderId) async {
     final nestedPlaylists =
-    await _googleDriveService.scanNestedFolders(rootFolderId);
+        await _googleDriveService.scanNestedFolders(rootFolderId);
     final current = getCachedPlaylists();
     final updated = [...current, ...nestedPlaylists];
     await _savePlaylists(updated);
     return nestedPlaylists;
   }
-
 }
-

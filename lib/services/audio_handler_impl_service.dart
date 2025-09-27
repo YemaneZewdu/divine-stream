@@ -1,0 +1,133 @@
+import 'dart:developer';
+
+import 'package:audio_service/audio_service.dart';
+import 'package:divine_stream/helpers/app_helpers.dart';
+import 'package:just_audio/just_audio.dart';
+
+class AudioHandlerImplService extends BaseAudioHandler with QueueHandler, SeekHandler {
+  final _player = AudioPlayer();
+  final _playlist = ConcatenatingAudioSource(children: []);
+  List<MediaItem> _mediaItems = [];
+
+  AudioHandlerImplService() {
+    _init();
+  }
+
+  Future<void> _init() async {
+    // 1. Broadcast playback state changes
+    _player.playerStateStream.listen(_broadcastState);
+
+    // 2. Broadcast current track metadata
+    _player.currentIndexStream.listen((index) {
+      if (index != null && index < _mediaItems.length) {
+        mediaItem.add(_mediaItems[index]);
+      }
+    });
+
+    // 3. Broadcast current playback position
+    _player.positionStream.listen((position) {
+      playbackState.add(playbackState.value.copyWith(
+        updatePosition: position,
+        bufferedPosition: _player.bufferedPosition,
+        speed: _player.speed,
+      ));
+    });
+
+    //  Error handler
+    _player.playbackEventStream.listen((event) {}, onError: (Object error, StackTrace stackTrace) {
+      Helpers.showToast('Audio error occurred: $error');
+    });
+  }
+
+  /// Set a full playlist of tracks and start playback
+  Future<void> loadPlaylist(List<MediaItem> items) async {
+    _mediaItems = items;
+    queue.add(items); // tell the system what’s in the queue
+
+    // DEBUG: print each URL
+    for (var item in items) {
+      log(' loadPlaylist URL: ${item.id}');
+    }
+
+    final sources = items.map((item) => AudioSource.uri(Uri.parse(item.id))).toList();
+    _playlist.clear();
+    _playlist.addAll(sources);
+
+    log('\n››› Setting audio source and auto-playing');
+    await _player.setAudioSource(_playlist);
+    mediaItem.add(_mediaItems[0]);
+    //  this line ensures auto play starts once the playlist is loaded
+    //await play();
+  }
+
+  /// Expose the raw processingState from just_audio
+  Stream<ProcessingState> get processingStateStream =>
+      _player.processingStateStream;
+
+  /// Player Controls
+  @override
+  Future<void> play() => _player.play();
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> stop() => _player.stop();
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> skipToNext() => _player.seekToNext();
+
+  @override
+  Future<void> skipToPrevious() => _player.seekToPrevious();
+
+  /// Skip to specific item
+  @override
+  Future<void> skipToQueueItem(int index) async {
+    if (index >= 0 && index < _mediaItems.length) {
+      await _player.seek(Duration.zero, index: index);
+    }
+  }
+
+  Stream<Duration?> get durationStream => _player.durationStream;
+
+
+  void _broadcastState(PlayerState state) {
+    final isPlaying = state.playing;
+    final processingState = state.processingState;
+    log('\n Audio playing state: $isPlaying');
+
+    playbackState.add(PlaybackState(
+      controls: [
+        MediaControl.skipToPrevious,
+        isPlaying ? MediaControl.pause : MediaControl.play,
+        MediaControl.stop,
+        MediaControl.skipToNext,
+      ],
+      androidCompactActionIndices: const [0, 1, 3],
+      processingState: _transformState(processingState),
+      playing: isPlaying,
+      updatePosition: _player.position,
+      bufferedPosition: _player.bufferedPosition,
+      speed: _player.speed,
+    ));
+  }
+
+  AudioProcessingState _transformState(ProcessingState state) {
+    switch (state) {
+      case ProcessingState.idle:
+        return AudioProcessingState.idle;
+      case ProcessingState.loading:
+        return AudioProcessingState.loading;
+      case ProcessingState.buffering:
+        return AudioProcessingState.buffering;
+      case ProcessingState.ready:
+        return AudioProcessingState.ready;
+      case ProcessingState.completed:
+        return AudioProcessingState.completed;
+    }
+  }
+}
+
