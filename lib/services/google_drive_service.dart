@@ -5,7 +5,6 @@ import '../models/playlist.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GoogleDriveService {
-
   final api_key = dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
 
   /// Fetch direct subfolders under a given parent folder
@@ -17,7 +16,7 @@ class GoogleDriveService {
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      List files = data['files'];
+      final List<dynamic> files = (data['files'] as List?) ?? const [];
       return files.map<Map<String, dynamic>>((folder) {
         return {'id': folder['id'], 'name': folder['name']};
       }).toList();
@@ -28,37 +27,62 @@ class GoogleDriveService {
 
   /// Fetch audio files in a specific folder (non-recursive)
   Future<List<Map<String, dynamic>>> fetchAudioFiles(String folderId) async {
+    // Allow both native audio mime-types and generic binary uploads so we catch
+    // files that Drive stores as `application/octet-stream` even when they are
+    // audio tracks.
+    final query =
+        "'$folderId' in parents and (mimeType contains 'audio/' or mimeType = 'application/octet-stream')";
+
     final url = Uri.https(
       'www.googleapis.com',
       '/drive/v3/files',
       {
-        'q': "'$folderId' in parents and mimeType contains 'audio/'",
+        'q': query,
         'fields': 'files(id,name,webContentLink)',
         'key': api_key,
       },
     ).toString();
-
 
     //"https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+mimeType+contains+'audio/'&fields=files(id,name,webContentLink)&key=$api_key";
     print("🔄 fetchAudioFiles URL: $url");
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      List files = data['files'];
-      print("🔄 fetchAudioFiles returned ${files.length} items");
-      return files.map<Map<String, dynamic>>((file) {
+      final List<dynamic> files = (data['files'] as List?) ?? const [];
+
+      // Filter by common audio extensions to avoid pulling non-audio binaries
+      // that matched the broader Drive query above.
+      const allowedExtensions = [
+        '.aac',
+        '.m4a',
+        '.mp3',
+        '.oga',
+        '.ogg',
+        '.opus',
+        '.wav',
+      ];
+
+      bool hasAllowedExtension(String? name) {
+        if (name == null) return false;
+        final lowerName = name.toLowerCase();
+        return allowedExtensions.any(lowerName.endsWith);
+      }
+
+      final filteredFiles = files.where((file) => hasAllowedExtension(file['name'])).toList();
+
+      print("🔄 fetchAudioFiles returned ${filteredFiles.length} items after filtering");
+      return filteredFiles.map<Map<String, dynamic>>((file) {
         return {
           'id': file['id'],
           'name': file['name'],
           'url':
-          'https://www.googleapis.com/drive/v3/files/${file['id']}?alt=media&key=$api_key',
+              'https://www.googleapis.com/drive/v3/files/${file['id']}?alt=media&key=$api_key',
         };
       }).toList();
     } else {
       throw Exception("Failed to fetch audio files: ${response.body}");
     }
   }
-
 
   /// Fetch folder metadata (e.g., name)
   Future<Map<String, dynamic>> fetchFolderInfo(String folderId) async {

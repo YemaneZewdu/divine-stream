@@ -15,35 +15,34 @@ class HomeView extends StackedView<HomeViewModel> {
               actions: [
                 IconButton(
                     icon: Icon(Icons.refresh),
-                    onPressed: () => viewModel.refreshAllPlaylists()
-                ),
+                    onPressed: () => viewModel.refreshAllPlaylists()),
               ],
             ),
             body: viewModel.isBusy
                 ? Center(child: CircularProgressIndicator())
                 : viewModel.playlists.isEmpty
-                ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  "No playlists yet.\nTap + to import from Google Drive.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16),
-                ),
-              ),
-            )
-                : ListView.builder(
-              itemCount: viewModel.playlists.length,
-              itemBuilder: (context, index) {
-                final playlist = viewModel.playlists[index];
-                return ListTile(
-                  title: Text(playlist.name),
-                  subtitle: Text(
-                      "${playlist.audioFiles.length} audio files"),
-                  onTap: () => viewModel.openPlaylist(playlist),
-                );
-              },
-            ),
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Text(
+                            "No playlists yet.\nTap + to import from Google Drive.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: viewModel.playlists.length,
+                        itemBuilder: (context, index) {
+                          final playlist = viewModel.playlists[index];
+                          return ListTile(
+                            title: Text(playlist.name),
+                            subtitle: Text(
+                                "${playlist.audioFiles.length} audio files"),
+                            onTap: () => viewModel.openPlaylist(playlist),
+                          );
+                        },
+                      ),
             floatingActionButton: FloatingActionButton(
               onPressed: viewModel.importFromGoogleDriveFolder,
               child: Icon(Icons.add),
