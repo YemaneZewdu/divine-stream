@@ -15,11 +15,19 @@ class HomeViewModel extends BaseViewModel {
   final GoogleDriveService _googleDriveService = locator<GoogleDriveService>();
   final NavigationService _navigationService = locator<NavigationService>();
 
+  List<Playlist> playlists = [];
+
   /// Initializes the home screen.
   /// - Loads cached playlists (if any) and then refreshes them from Google Drive.
-  Future<void> initialize() async {}
+  Future<void> initialize() async {
+    setBusy(true);
+    // Load cached playlists for a quick UI update.
+    playlists = _playlistService.getCachedPlaylists();
+    notifyListeners();
 
-  List<Playlist> playlists = [];
+    setBusy(false);
+  }
+
 
   /// Refreshes all playlists (re-syncs from Google Drive)
   Future<void> refreshAllPlaylists() async {
