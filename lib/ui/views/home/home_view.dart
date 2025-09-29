@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_swipe_action_cell/flutter_swipe_action_cell.dart';
 import 'package:stacked/stacked.dart';
 import 'home_viewmodel.dart';
 
@@ -35,11 +36,27 @@ class HomeView extends StackedView<HomeViewModel> {
                         itemCount: viewModel.playlists.length,
                         itemBuilder: (context, index) {
                           final playlist = viewModel.playlists[index];
-                          return ListTile(
-                            title: Text(playlist.name),
-                            subtitle: Text(
-                                "${playlist.audioFiles.length} audio files"),
-                            onTap: () => viewModel.openPlaylist(playlist),
+                          return SwipeActionCell(
+                            key: ValueKey(playlist.id),
+                            trailingActions: [
+                              SwipeAction(
+                                /// Use destructive styling so the intent is clear.
+                                color: Colors.red,
+                                icon: Icon(Icons.delete, color: Colors.white),
+                                onTap: (handler) async {
+                                  final removed =
+                                      await viewModel.deletePlaylist(playlist);
+                                  // Close the cell; pass true only when we actually removed it.
+                                  await handler(removed);
+                                },
+                              ),
+                            ],
+                            child: ListTile(
+                              title: Text(playlist.name),
+                              subtitle: Text(
+                                  "${playlist.audioFiles.length} audio files"),
+                              onTap: () => viewModel.openPlaylist(playlist),
+                            ),
                           );
                         },
                       ),
