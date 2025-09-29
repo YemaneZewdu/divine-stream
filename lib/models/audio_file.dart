@@ -12,10 +12,24 @@ class AudioFile {
   });
 
   factory AudioFile.fromJson(Map<String, dynamic> json) {
+    // If older cache entries still include an API key query param, strip it so
+    // the URL stays valid even after the key changes.
+    String sanitizedUrl = json['url'] ?? '';
+    try {
+      final uri = Uri.parse(sanitizedUrl);
+      if (uri.queryParameters.containsKey('key')) {
+        final filteredParams = Map<String, String>.from(uri.queryParameters)
+          ..remove('key');
+        sanitizedUrl = uri.replace(queryParameters: filteredParams).toString();
+      }
+    } catch (_) {
+      // Leave the original value if parsing fails; playback will surface the error.
+    }
+
     return AudioFile(
       id: json['id'] ?? '',
       title: json['title'] ?? '',
-      url: json['url'] ?? '',
+      url: sanitizedUrl,
       name: json['name'],
     );
   }

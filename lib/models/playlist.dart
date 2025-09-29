@@ -5,7 +5,29 @@ class Playlist {
   final String name; // Playlist name (subfolder name from Google Drive)
   final List<AudioFile> audioFiles; // List of audio files in this playlist
 
-  Playlist({required this.id, required this.name, required this.audioFiles});
+  /// Stores the persisted track ID we should highlight when this playlist opens.
+  final String? lastPlayedTrackId;
+
+  Playlist({
+    required this.id,
+    required this.name,
+    required this.audioFiles,
+    this.lastPlayedTrackId,
+  });
+
+  Playlist copyWith({
+    String? id,
+    String? name,
+    List<AudioFile>? audioFiles,
+    String? lastPlayedTrackId,
+  }) {
+    return Playlist(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      audioFiles: audioFiles ?? this.audioFiles,
+      lastPlayedTrackId: lastPlayedTrackId ?? this.lastPlayedTrackId,
+    );
+  }
 
   /// Convert from JSON (when fetching from local storage or API)
   factory Playlist.fromJson(Map<String, dynamic> json) {
@@ -24,6 +46,7 @@ class Playlist {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       audioFiles: audioFiles,
+      lastPlayedTrackId: json['lastPlayedTrackId'] as String?,
     );
   }
 
@@ -33,6 +56,7 @@ class Playlist {
       'id': id,
       'name': name,
       'audioFiles': audioFiles.map((file) => file.toJson()).toList(),
+      'lastPlayedTrackId': lastPlayedTrackId,
     };
   }
 
@@ -40,6 +64,14 @@ class Playlist {
   AudioFile? findAudioFile(String fileId) {
     return audioFiles.firstWhere((file) => file.id == fileId,
         orElse: () => AudioFile.empty());
+  }
+
+  /// Returns the index of the stored last played track, if we still have it.
+  int? lastPlayedIndex() {
+    if (lastPlayedTrackId == null) return null;
+    final index =
+        audioFiles.indexWhere((file) => file.id == lastPlayedTrackId);
+    return index >= 0 ? index : null;
   }
 
   /// Create an empty playlist

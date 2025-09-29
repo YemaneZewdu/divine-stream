@@ -96,9 +96,17 @@ class HomeViewModel extends BaseViewModel {
 
   /// Navigates to playlist view
   void openPlaylist(Playlist playlist) {
+    // Pull only the persisted last-played marker so we don't lose the fresh
+    // in-memory playlist (its audio URLs are up to date, whereas the cached
+    // copy may still contain stale links).
+    final lastPlayedId =
+        _playlistService.getLastPlayedTrackId(playlist.id);
+    final playlistWithMarker =
+        playlist.copyWith(lastPlayedTrackId: lastPlayedId);
+
     _navigationService.navigateTo(
       Routes.playlistView,
-      arguments: PlaylistViewArguments(playlist: playlist),
+      arguments: PlaylistViewArguments(playlist: playlistWithMarker),
     );
   }
 }
