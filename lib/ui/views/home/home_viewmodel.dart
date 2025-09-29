@@ -109,4 +109,41 @@ class HomeViewModel extends BaseViewModel {
       arguments: PlaylistViewArguments(playlist: playlistWithMarker),
     );
   }
+
+  /// Delete playlist after user confirms via platform-specific dialog.
+  Future<bool> deletePlaylist(Playlist playlist) async {
+    final context = StackedService.navigatorKey?.currentContext;
+    if (context == null) return false;
+
+    final confirmed = await Helpers.showPlatformConfirmation(
+      context: context,
+      title: 'Delete Playlist',
+      message: 'Remove "${playlist.name}" from the app?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    );
+
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      await _playlistService.deletePlaylist(playlist.id);
+      playlists = playlists
+          .where((existing) => existing.id != playlist.id)
+          .toList();
+      notifyListeners();
+
+      Helpers.showToast(
+        'Playlist deleted',
+        backgroundColor: Colors.green,
+      );
+      return true;
+    } catch (e) {
+      Helpers.showToast(
+        'Delete failed: ${Helpers.shorten(e.toString())}',
+      );
+      return false;
+    }
+  }
 }

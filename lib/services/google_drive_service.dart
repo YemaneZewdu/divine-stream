@@ -68,7 +68,13 @@ class GoogleDriveService {
         return allowedExtensions.any(lowerName.endsWith);
       }
 
-      final filteredFiles = files.where((file) => hasAllowedExtension(file['name'])).toList();
+      for (final file in files) {
+        final name = file['name'];
+        print('🔍 Drive returned file: $name');
+      }
+
+      final filteredFiles =
+          files.where((file) => hasAllowedExtension(file['name'])).toList();
 
       print("🔄 fetchAudioFiles returned ${filteredFiles.length} items after filtering");
       return filteredFiles.map<Map<String, dynamic>>((file) {

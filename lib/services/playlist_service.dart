@@ -103,4 +103,17 @@ class PlaylistService {
     await _savePlaylists(refreshed);
     return refreshed;
   }
+
+  /// Removes a playlist (and its cached state) from local storage.
+  Future<void> deletePlaylist(String playlistId) async {
+    final playlists = getCachedPlaylists();
+    final updated =
+        playlists.where((playlist) => playlist.id != playlistId).toList();
+
+    if (updated.length == playlists.length) {
+      return; // Nothing to delete; keep storage untouched.
+    }
+
+    await _savePlaylists(updated);
+  }
 }

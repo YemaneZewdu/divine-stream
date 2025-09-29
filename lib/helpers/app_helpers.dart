@@ -1,5 +1,8 @@
-import 'package:fluttertoast/fluttertoast.dart';
 import 'dart:ui';
+
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 import 'app_colors.dart';
 
@@ -34,5 +37,57 @@ class Helpers {
     return text.length <= maxLength
         ? text
         : text.substring(0, maxLength) + '...';
+  }
+
+  /// Shows a platform-aware confirmation dialog and returns true when the user
+  /// accepts the action.
+  static Future<bool> showPlatformConfirmation({
+    required BuildContext context,
+    required String title,
+    required String message,
+    String confirmLabel = 'Delete',
+    String cancelLabel = 'Cancel',
+  }) async {
+    if (Theme.of(context).platform == TargetPlatform.iOS) {
+      final result = await showCupertinoDialog<bool>(
+        context: context,
+        builder: (_) => CupertinoAlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            CupertinoDialogAction(
+              child: Text(cancelLabel),
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              child: Text(confirmLabel),
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+            ),
+          ],
+        ),
+      );
+      return result ?? false;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            child: Text(cancelLabel),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(false),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(confirmLabel),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }
