@@ -165,6 +165,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/models/audio_file.dart';
 import 'package:divine_stream/services/audio_handler_impl_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked_annotations.dart';
 
@@ -176,6 +177,28 @@ class AudioPlayerService {
 
   // Track the last‐loaded playlist ID. Set this in setPlaylist().
   String? _loadedPlaylistId;
+
+  /// Drive expects an API key for direct media downloads; rebuild the URL with
+  /// the current key at playback time so cached entries do not go stale when the
+  /// key rotates.
+  String _buildPlaybackUrl(AudioFile file) {
+    final baseUrl = file.url;
+    if (baseUrl.isEmpty) return baseUrl;
+
+    final apiKey = dotenv.env['GOOGLE_DRIVE_API_KEY'];
+    if (apiKey == null || apiKey.isEmpty) {
+      return baseUrl;
+    }
+
+    try {
+      final uri = Uri.parse(baseUrl);
+      final params = Map<String, String>.from(uri.queryParameters);
+      params['key'] = apiKey;
+      return uri.replace(queryParameters: params).toString();
+    } catch (_) {
+      return baseUrl;
+    }
+  }
 
   /// Returns true if setPlaylist(...) was already called with this same ID
   bool isPlaylistLoaded(String id) => _loadedPlaylistId == id;
@@ -194,10 +217,12 @@ class AudioPlayerService {
   // Load and prepare a playlist from a list of audio URLs
   Future<void> setPlaylist(List<AudioFile> audioFiles,
       {int startIndex = 0}) async {
+    print("\n in setPlaylist 1\n");
     // Create media items with metadata
     _mediaItems = audioFiles.map((file) {
+      final playbackUrl = _buildPlaybackUrl(file);
       return MediaItem(
-        id: file.url,
+        id: playbackUrl,
         title: file.name, // ✅ Use real name from AudioFile
         artist: 'Streaming Hymns',
         album: 'Imported Playlist',

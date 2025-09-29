@@ -75,8 +75,10 @@ class GoogleDriveService {
         return {
           'id': file['id'],
           'name': file['name'],
+          // Public files can be streamed without an API key; omitting the key
+          // keeps cached URLs from breaking if the key is rotated later.
           'url':
-              'https://www.googleapis.com/drive/v3/files/${file['id']}?alt=media&key=$api_key',
+              'https://www.googleapis.com/drive/v3/files/${file['id']}?alt=media',
         };
       }).toList();
     } else {

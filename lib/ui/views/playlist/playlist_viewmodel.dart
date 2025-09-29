@@ -2,6 +2,7 @@ import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/audio_player_service.dart';
+import 'package:divine_stream/services/playlist_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked.dart';
 
@@ -9,6 +10,7 @@ import '../../../models/audio_file.dart';
 
 class PlaylistViewModel extends BaseViewModel {
   final AudioPlayerService _audioService = locator<AudioPlayerService>();
+  final PlaylistService _playlistService = locator<PlaylistService>();
 
   late Playlist playlist;
   List<AudioFile> tracks = [];
@@ -41,6 +43,8 @@ class PlaylistViewModel extends BaseViewModel {
   Future<void> init(Playlist p) async {
     playlist = p;
     tracks = p.audioFiles;
+    // Default to the cached last played track; fall back to the first one.
+    currentIndex = p.lastPlayedIndex() ?? 0;
     notifyListeners(); // show UI immediately
 
     // Listen for processing state to update isBusy:
@@ -64,13 +68,13 @@ class PlaylistViewModel extends BaseViewModel {
     setBusy(true);
 
     // ✅ Prepare URLs and set the playlist (with error handling)
-    final urls = tracks.map((t) => t.url).toList();
     try {
-      await _audioService.setPlaylist(tracks, startIndex: 0);
+      await _audioService.setPlaylist(tracks, startIndex: currentIndex);
       //await _audioService.play();
     } catch (e) {
+      print(e.toString());
       setBusy(false);
-      Helpers.showToast("Please try again");
+      Helpers.showToast("Please try again in playlist vm");
     }
 
     _subscribeToStreams();
@@ -110,6 +114,12 @@ class PlaylistViewModel extends BaseViewModel {
     _audioService.currentIndexStream.listen((newIndex) {
       if (newIndex != null) {
         currentIndex = newIndex;
+        if (newIndex >= 0 && newIndex < tracks.length) {
+          final trackId = tracks[newIndex].id;
+          // Persist the new position so reopening the playlist resumes here.
+          _playlistService.setLastPlayedTrack(playlist.id, trackId);
+          playlist = playlist.copyWith(lastPlayedTrackId: trackId);
+        }
         notifyListeners();
       }
     });
@@ -120,6 +130,9 @@ class PlaylistViewModel extends BaseViewModel {
     notifyListeners();
     // Jump the playlist directly:
     await _audioService.skipToIndex(index);
+    final trackId = tracks[index].id;
+    await _playlistService.setLastPlayedTrack(playlist.id, trackId);
+    playlist = playlist.copyWith(lastPlayedTrackId: trackId);
     //await _audioService.play();
   }
 
@@ -177,8 +190,6 @@ class PlaylistViewModel extends BaseViewModel {
   void dispose() {
     // _audioService.dispose();
     _audioService.pause();
-    // Reset to beginning
-    _audioService.skipToIndex(0);
     super.dispose();
   }
 
