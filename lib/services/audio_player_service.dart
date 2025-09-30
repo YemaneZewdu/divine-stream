@@ -161,6 +161,8 @@
 //   }
 // }
 
+import 'dart:developer';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/models/audio_file.dart';
@@ -221,6 +223,7 @@ class AudioPlayerService {
     // Create media items with metadata
     _mediaItems = audioFiles.map((file) {
       final playbackUrl = _buildPlaybackUrl(file);
+      log('Playback URL resolved for ${file.name}: $playbackUrl');
       return MediaItem(
         id: playbackUrl,
         title: file.name, // ✅ Use real name from AudioFile

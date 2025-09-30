@@ -30,8 +30,17 @@ class AudioFile {
       id: json['id'] ?? '',
       title: json['title'] ?? '',
       url: sanitizedUrl,
-      name: json['name'],
+      name: _stripExtension(json['name']),
     );
+  }
+
+
+  /// Removes the trailing file extension so track titles are cleaner in the UI.
+  static String _stripExtension(String? name) {
+    if (name == null || name.isEmpty) return '';
+    final index = name.lastIndexOf('.');
+    if (index <= 0) return name;
+    return name.substring(0, index);
   }
 
   Map<String, dynamic> toJson() {

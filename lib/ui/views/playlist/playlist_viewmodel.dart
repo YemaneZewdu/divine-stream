@@ -188,8 +188,6 @@ class PlaylistViewModel extends BaseViewModel {
 
   @override
   void dispose() {
-    // _audioService.dispose();
-    _audioService.pause();
     super.dispose();
   }
 
