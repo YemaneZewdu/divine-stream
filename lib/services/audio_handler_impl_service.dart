@@ -4,7 +4,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:just_audio/just_audio.dart';
 
-class AudioHandlerImplService extends BaseAudioHandler with QueueHandler, SeekHandler {
+class AudioHandlerImplService extends BaseAudioHandler
+    with QueueHandler, SeekHandler {
   final _player = AudioPlayer();
   final _playlist = ConcatenatingAudioSource(children: []);
   List<MediaItem> _mediaItems = [];
@@ -33,6 +34,16 @@ class AudioHandlerImplService extends BaseAudioHandler with QueueHandler, SeekHa
       ));
     });
 
+    // 4. Keep the now-playing item in sync with duration updates so lock screens
+    // show the correct progress bar once just_audio discovers the length.
+    _player.durationStream.listen((duration) {
+      if (duration == null) return;
+      final current = mediaItem.value;
+      if (current == null) return;
+
+      mediaItem.add(current.copyWith(duration: duration));
+    });
+
     //  Error handler
     _player.playbackEventStream.listen((event) {}, onError: (Object error, StackTrace stackTrace) {
       Helpers.showToast('Audio error occurred: $error');
@@ -47,17 +58,18 @@ class AudioHandlerImplService extends BaseAudioHandler with QueueHandler, SeekHa
     // DEBUG: print each URL
     for (var item in items) {
       log(' loadPlaylist URL: ${item.id}');
+      log('AudioHandler loading ${item.id}');
     }
 
     final sources = items.map((item) => AudioSource.uri(Uri.parse(item.id))).toList();
     _playlist.clear();
     _playlist.addAll(sources);
 
-    log('\n››› Setting audio source and auto-playing');
+    log('\n››› Setting audio source');
     await _player.setAudioSource(_playlist);
     mediaItem.add(_mediaItems[0]);
-    //  this line ensures auto play starts once the playlist is loaded
-    //await play();
+    // Let the caller decide when to start playback so we can seek to the saved
+    // track index first; auto-play happens via view model after skipToQueueItem.
   }
 
   /// Expose the raw processingState from just_audio
@@ -92,6 +104,13 @@ class AudioHandlerImplService extends BaseAudioHandler with QueueHandler, SeekHa
   }
 
   Stream<Duration?> get durationStream => _player.durationStream;
+
+  @override
+  Future<void> onTaskRemoved() async {
+    // Keep the notification and audio session alive when the OS removes the
+    // task from recents; this mirrors typical media app behaviour.
+    // No-op here, but returning ensures audio_service doesn’t stop playback.
+  }
 
 
   void _broadcastState(PlayerState state) {
@@ -130,4 +149,3 @@ class AudioHandlerImplService extends BaseAudioHandler with QueueHandler, SeekHa
     }
   }
 }
-
