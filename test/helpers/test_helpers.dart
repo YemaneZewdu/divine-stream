@@ -2,6 +2,10 @@ import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:stacked_services/stacked_services.dart';
+import 'package:divine_stream/services/playlist_service.dart';
+import 'package:divine_stream/services/google_drive_service.dart';
+import 'package:divine_stream/services/audio_player_service.dart';
+import 'package:divine_stream/services/audio_handler_impl_service.dart';
 // @stacked-import
 
 import 'test_helpers.mocks.dart';
@@ -10,13 +14,21 @@ import 'test_helpers.mocks.dart';
   MockSpec<NavigationService>(onMissingStub: OnMissingStub.returnDefault),
   MockSpec<BottomSheetService>(onMissingStub: OnMissingStub.returnDefault),
   MockSpec<DialogService>(onMissingStub: OnMissingStub.returnDefault),
-  // @stacked-mock-spec
+  MockSpec<PlaylistService>(onMissingStub: OnMissingStub.returnDefault),
+  MockSpec<GoogleDriveService>(onMissingStub: OnMissingStub.returnDefault),
+  MockSpec<AudioPlayerService>(onMissingStub: OnMissingStub.returnDefault),
+  MockSpec<AudioHandlerImplService>(onMissingStub: OnMissingStub.returnDefault),
+// @stacked-mock-spec
 ])
 void registerServices() {
   getAndRegisterNavigationService();
   getAndRegisterBottomSheetService();
   getAndRegisterDialogService();
-  // @stacked-mock-register
+  //getAndRegisterPlaylistService();
+  getAndRegisterGoogleDriveService();
+  getAndRegisterAudioPlayerService();
+  getAndRegisterAudioHandlerImplService();
+// @stacked-mock-register
 }
 
 MockNavigationService getAndRegisterNavigationService() {
@@ -69,6 +81,33 @@ MockDialogService getAndRegisterDialogService() {
   return service;
 }
 
+// MockPlaylistServiceService getAndRegisterPlaylistServiceService() {
+//   _removeRegistrationIfExists<PlaylistService>();
+//   final service = MockPlaylistServiceService();
+//   locator.registerSingleton<PlaylistService>(service as PlaylistService);
+//   return service;
+// }
+
+MockGoogleDriveService getAndRegisterGoogleDriveService() {
+  _removeRegistrationIfExists<GoogleDriveService>();
+  final service = MockGoogleDriveService();
+  locator.registerSingleton<GoogleDriveService>(service);
+  return service;
+}
+
+MockAudioPlayerService getAndRegisterAudioPlayerService() {
+  _removeRegistrationIfExists<AudioPlayerService>();
+  final service = MockAudioPlayerService();
+  locator.registerSingleton<AudioPlayerService>(service);
+  return service;
+}
+
+MockAudioHandlerImplService getAndRegisterAudioHandlerImplService() {
+  _removeRegistrationIfExists<AudioHandlerImplService>();
+  final service = MockAudioHandlerImplService();
+  locator.registerSingleton<AudioHandlerImplService>(service);
+  return service;
+}
 // @stacked-mock-create
 
 void _removeRegistrationIfExists<T extends Object>() {
