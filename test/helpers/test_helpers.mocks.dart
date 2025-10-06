@@ -6,7 +6,15 @@
 import 'dart:async' as _i5;
 import 'dart:ui' as _i6;
 
+import 'package:audio_service/audio_service.dart' as _i12;
+import 'package:divine_stream/models/audio_file.dart' as _i13;
+import 'package:divine_stream/models/playlist.dart' as _i8;
+import 'package:divine_stream/services/audio_handler_impl_service.dart' as _i14;
+import 'package:divine_stream/services/audio_player_service.dart' as _i10;
+import 'package:divine_stream/services/google_drive_service.dart' as _i9;
+import 'package:divine_stream/services/playlist_service.dart' as _i7;
 import 'package:flutter/material.dart' as _i4;
+import 'package:just_audio/just_audio.dart' as _i11;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i3;
 import 'package:stacked_services/stacked_services.dart' as _i2;
@@ -682,3 +690,265 @@ class MockDialogService extends _i1.Mock implements _i2.DialogService {
         returnValueForMissingStub: null,
       );
 }
+
+/// A class which mocks [PlaylistService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockPlaylistService extends _i1.Mock implements _i7.PlaylistService {
+  @override
+  List<_i8.Playlist> getCachedPlaylists() => (super.noSuchMethod(
+        Invocation.method(
+          #getCachedPlaylists,
+          [],
+        ),
+        returnValue: <_i8.Playlist>[],
+        returnValueForMissingStub: <_i8.Playlist>[],
+      ) as List<_i8.Playlist>);
+
+  @override
+  _i5.Future<List<_i8.Playlist>> importNestedPlaylists(String? rootFolderId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #importNestedPlaylists,
+          [rootFolderId],
+        ),
+        returnValue: _i5.Future<List<_i8.Playlist>>.value(<_i8.Playlist>[]),
+        returnValueForMissingStub:
+            _i5.Future<List<_i8.Playlist>>.value(<_i8.Playlist>[]),
+      ) as _i5.Future<List<_i8.Playlist>>);
+}
+
+/// A class which mocks [GoogleDriveService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockGoogleDriveService extends _i1.Mock
+    implements _i9.GoogleDriveService {
+  @override
+  String get api_key => (super.noSuchMethod(
+        Invocation.getter(#api_key),
+        returnValue: _i3.dummyValue<String>(
+          this,
+          Invocation.getter(#api_key),
+        ),
+        returnValueForMissingStub: _i3.dummyValue<String>(
+          this,
+          Invocation.getter(#api_key),
+        ),
+      ) as String);
+
+  @override
+  _i5.Future<List<Map<String, dynamic>>> fetchSubFolders(
+          String? parentFolderId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #fetchSubFolders,
+          [parentFolderId],
+        ),
+        returnValue: _i5.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+        returnValueForMissingStub: _i5.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+      ) as _i5.Future<List<Map<String, dynamic>>>);
+
+  @override
+  _i5.Future<List<Map<String, dynamic>>> fetchAudioFiles(String? folderId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #fetchAudioFiles,
+          [folderId],
+        ),
+        returnValue: _i5.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+        returnValueForMissingStub: _i5.Future<List<Map<String, dynamic>>>.value(
+            <Map<String, dynamic>>[]),
+      ) as _i5.Future<List<Map<String, dynamic>>>);
+
+  @override
+  _i5.Future<Map<String, dynamic>> fetchFolderInfo(String? folderId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #fetchFolderInfo,
+          [folderId],
+        ),
+        returnValue:
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+        returnValueForMissingStub:
+            _i5.Future<Map<String, dynamic>>.value(<String, dynamic>{}),
+      ) as _i5.Future<Map<String, dynamic>>);
+
+  @override
+  _i5.Future<List<_i8.Playlist>> scanNestedFolders(String? parentFolderId) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #scanNestedFolders,
+          [parentFolderId],
+        ),
+        returnValue: _i5.Future<List<_i8.Playlist>>.value(<_i8.Playlist>[]),
+        returnValueForMissingStub:
+            _i5.Future<List<_i8.Playlist>>.value(<_i8.Playlist>[]),
+      ) as _i5.Future<List<_i8.Playlist>>);
+}
+
+/// A class which mocks [AudioPlayerService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockAudioPlayerService extends _i1.Mock
+    implements _i10.AudioPlayerService {
+  @override
+  bool get isReady => (super.noSuchMethod(
+        Invocation.getter(#isReady),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
+  _i5.Stream<_i11.ProcessingState> get processingStateStream =>
+      (super.noSuchMethod(
+        Invocation.getter(#processingStateStream),
+        returnValue: _i5.Stream<_i11.ProcessingState>.empty(),
+        returnValueForMissingStub: _i5.Stream<_i11.ProcessingState>.empty(),
+      ) as _i5.Stream<_i11.ProcessingState>);
+
+  @override
+  _i5.Stream<_i12.PlaybackState> get playbackStateStream => (super.noSuchMethod(
+        Invocation.getter(#playbackStateStream),
+        returnValue: _i5.Stream<_i12.PlaybackState>.empty(),
+        returnValueForMissingStub: _i5.Stream<_i12.PlaybackState>.empty(),
+      ) as _i5.Stream<_i12.PlaybackState>);
+
+  @override
+  _i5.Stream<_i12.MediaItem?> get mediaItemStream => (super.noSuchMethod(
+        Invocation.getter(#mediaItemStream),
+        returnValue: _i5.Stream<_i12.MediaItem?>.empty(),
+        returnValueForMissingStub: _i5.Stream<_i12.MediaItem?>.empty(),
+      ) as _i5.Stream<_i12.MediaItem?>);
+
+  @override
+  _i5.Stream<bool> get playerStateStream => (super.noSuchMethod(
+        Invocation.getter(#playerStateStream),
+        returnValue: _i5.Stream<bool>.empty(),
+        returnValueForMissingStub: _i5.Stream<bool>.empty(),
+      ) as _i5.Stream<bool>);
+
+  @override
+  _i5.Stream<Duration> get positionStream => (super.noSuchMethod(
+        Invocation.getter(#positionStream),
+        returnValue: _i5.Stream<Duration>.empty(),
+        returnValueForMissingStub: _i5.Stream<Duration>.empty(),
+      ) as _i5.Stream<Duration>);
+
+  @override
+  _i5.Stream<Duration> get durationStream => (super.noSuchMethod(
+        Invocation.getter(#durationStream),
+        returnValue: _i5.Stream<Duration>.empty(),
+        returnValueForMissingStub: _i5.Stream<Duration>.empty(),
+      ) as _i5.Stream<Duration>);
+
+  @override
+  _i5.Stream<int?> get currentIndexStream => (super.noSuchMethod(
+        Invocation.getter(#currentIndexStream),
+        returnValue: _i5.Stream<int?>.empty(),
+        returnValueForMissingStub: _i5.Stream<int?>.empty(),
+      ) as _i5.Stream<int?>);
+
+  @override
+  bool isPlaylistLoaded(String? id) => (super.noSuchMethod(
+        Invocation.method(
+          #isPlaylistLoaded,
+          [id],
+        ),
+        returnValue: false,
+        returnValueForMissingStub: false,
+      ) as bool);
+
+  @override
+  _i5.Future<void> setPlaylist(
+    List<_i13.AudioFile>? audioFiles, {
+    int? startIndex = 0,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #setPlaylist,
+          [audioFiles],
+          {#startIndex: startIndex},
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> play() => (super.noSuchMethod(
+        Invocation.method(
+          #play,
+          [],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> pause() => (super.noSuchMethod(
+        Invocation.method(
+          #pause,
+          [],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> stop() => (super.noSuchMethod(
+        Invocation.method(
+          #stop,
+          [],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> seek(Duration? position) => (super.noSuchMethod(
+        Invocation.method(
+          #seek,
+          [position],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> skipToIndex(int? index) => (super.noSuchMethod(
+        Invocation.method(
+          #skipToIndex,
+          [index],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> playNext() => (super.noSuchMethod(
+        Invocation.method(
+          #playNext,
+          [],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+
+  @override
+  _i5.Future<void> playPrevious() => (super.noSuchMethod(
+        Invocation.method(
+          #playPrevious,
+          [],
+        ),
+        returnValue: _i5.Future<void>.value(),
+        returnValueForMissingStub: _i5.Future<void>.value(),
+      ) as _i5.Future<void>);
+}
+
+/// A class which mocks [AudioHandlerImplService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockAudioHandlerImplService extends _i1.Mock
+    implements _i14.AudioHandlerImplService {}
