@@ -167,6 +167,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/models/audio_file.dart';
 import 'package:divine_stream/services/audio_handler_impl_service.dart';
+import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked_annotations.dart';
@@ -174,6 +175,8 @@ import 'package:stacked/stacked_annotations.dart';
 @LazySingleton()
 class AudioPlayerService {
   final AudioHandler _handler = locator<AudioHandler>();
+  final ConnectivityService _connectivityService =
+      locator<ConnectivityService>();
 
   List<MediaItem> _mediaItems = [];
 
@@ -220,6 +223,11 @@ class AudioPlayerService {
   Future<void> setPlaylist(List<AudioFile> audioFiles,
       {int startIndex = 0}) async {
     print("\n in setPlaylist 1\n");
+    // Loading a remote playlist without connectivity causes confusing errors.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
     // Create media items with metadata
     _mediaItems = audioFiles.map((file) {
       final playbackUrl = _buildPlaybackUrl(file);
@@ -251,9 +259,32 @@ class AudioPlayerService {
   Future<void> pause() => _handler.pause();
   Future<void> stop() => _handler.stop();
   Future<void> seek(Duration position) => _handler.seek(position);
-  Future<void> skipToIndex(int index) => _handler.skipToQueueItem(index);
-  Future<void> playNext() => _handler.skipToNext();
-  Future<void> playPrevious() => _handler.skipToPrevious();
+  Future<void> skipToIndex(int index) async {
+    // Skipping fetches a new Drive stream; protect against offline actions.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
+    await _handler.skipToQueueItem(index);
+  }
+
+  Future<void> playNext() async {
+    // Skipping fetches a new Drive stream; protect against offline actions.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
+    await _handler.skipToNext();
+  }
+
+  Future<void> playPrevious() async {
+    // Skipping fetches a new Drive stream; protect against offline actions.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
+    await _handler.skipToPrevious();
+  }
 
   /// Streams for UI bindings
   Stream<PlaybackState> get playbackStateStream => _handler.playbackState;

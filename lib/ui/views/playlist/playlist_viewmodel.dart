@@ -3,6 +3,7 @@ import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/audio_player_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
+import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked.dart';
 
@@ -11,6 +12,8 @@ import '../../../models/audio_file.dart';
 class PlaylistViewModel extends BaseViewModel {
   final AudioPlayerService _audioService = locator<AudioPlayerService>();
   final PlaylistService _playlistService = locator<PlaylistService>();
+  final ConnectivityService _connectivityService =
+      locator<ConnectivityService>();
 
   late Playlist playlist;
   List<AudioFile> tracks = [];
@@ -66,6 +69,13 @@ class PlaylistViewModel extends BaseViewModel {
     }
 
     setBusy(true);
+
+    // Loading a playlist streams from Drive; abort cleanly if we are offline.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      setBusy(false);
+      return;
+    }
 
     // ✅ Prepare URLs and set the playlist (with error handling)
     try {
@@ -126,6 +136,11 @@ class PlaylistViewModel extends BaseViewModel {
   }
 
   Future<void> playTrack(int index) async {
+    // Do not attempt to pull a new track without connectivity.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
     currentIndex = index;
     notifyListeners();
     // Jump the playlist directly:
@@ -154,13 +169,19 @@ class PlaylistViewModel extends BaseViewModel {
       if (wasPlaying) {
         await _audioService.pause();
       } else {
+        final online = await _connectivityService.ensureConnection();
+        if (!online) {
+          // Connectivity check already surfaced the toast; keep UI in sync.
+          isPlaying = wasPlaying;
+          notifyListeners();
+          return;
+        }
         await _audioService.play();
       }
     } catch (e) {
       // 3. Roll back on error to avoid a misleading state.
       isPlaying = wasPlaying;
       notifyListeners();
-      rethrow;
     }
   }
 
@@ -171,6 +192,11 @@ class PlaylistViewModel extends BaseViewModel {
       _audioService.seek(position - Duration(seconds: 10));
 
   Future<void> playNext() async {
+    // Next/previous will stream new media; guard against offline usage.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
     if (currentIndex < tracks.length - 1) {
       currentIndex++;
       notifyListeners();
@@ -179,6 +205,11 @@ class PlaylistViewModel extends BaseViewModel {
   }
 
   Future<void> playPrevious() async {
+    // Next/previous will stream new media; guard against offline usage.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      return;
+    }
     if (currentIndex > 0) {
       currentIndex--;
       notifyListeners();

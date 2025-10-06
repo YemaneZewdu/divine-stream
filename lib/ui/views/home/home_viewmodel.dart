@@ -4,7 +4,7 @@ import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/app/app.router.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
-import 'package:divine_stream/services/google_drive_service.dart';
+import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
@@ -12,8 +12,9 @@ import 'package:stacked_services/stacked_services.dart';
 
 class HomeViewModel extends BaseViewModel {
   final PlaylistService _playlistService = locator<PlaylistService>();
-  final GoogleDriveService _googleDriveService = locator<GoogleDriveService>();
   final NavigationService _navigationService = locator<NavigationService>();
+  final ConnectivityService _connectivityService =
+      locator<ConnectivityService>();
 
   List<Playlist> playlists = [];
 
@@ -28,11 +29,16 @@ class HomeViewModel extends BaseViewModel {
     setBusy(false);
   }
 
-
   /// Refreshes all playlists (re-syncs from Google Drive)
   Future<void> refreshAllPlaylists() async {
     log("\n in refreshAllPlaylists\n ");
     setBusy(true);
+    // Quick exit when the device reports no connection so we avoid Drive errors.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      setBusy(false);
+      return;
+    }
     try {
       final updated = await _playlistService.refreshAll();
       playlists = updated;
@@ -40,8 +46,8 @@ class HomeViewModel extends BaseViewModel {
       Helpers.showToast("Playlists refreshed", backgroundColor: Colors.green);
     } catch (e) {
       log(e.toString());
-      Helpers.showToast("Error refreshing playlists: ${Helpers.shorten(e.toString())}");
-
+      Helpers.showToast(
+          "Error refreshing playlists: ${Helpers.shorten(e.toString())}");
     }
     setBusy(false);
   }
@@ -82,6 +88,12 @@ class HomeViewModel extends BaseViewModel {
     }
 
     setBusy(true);
+    // Drive imports are network-bound; surface a friendly toast if offline.
+    final online = await _connectivityService.ensureConnection();
+    if (!online) {
+      setBusy(false);
+      return;
+    }
     try {
       final newPlaylists =
           await _playlistService.importNestedPlaylists(folderId);
@@ -99,8 +111,7 @@ class HomeViewModel extends BaseViewModel {
     // Pull only the persisted last-played marker so we don't lose the fresh
     // in-memory playlist (its audio URLs are up to date, whereas the cached
     // copy may still contain stale links).
-    final lastPlayedId =
-        _playlistService.getLastPlayedTrackId(playlist.id);
+    final lastPlayedId = _playlistService.getLastPlayedTrackId(playlist.id);
     final playlistWithMarker =
         playlist.copyWith(lastPlayedTrackId: lastPlayedId);
 
@@ -129,9 +140,8 @@ class HomeViewModel extends BaseViewModel {
 
     try {
       await _playlistService.deletePlaylist(playlist.id);
-      playlists = playlists
-          .where((existing) => existing.id != playlist.id)
-          .toList();
+      playlists =
+          playlists.where((existing) => existing.id != playlist.id).toList();
       notifyListeners();
 
       Helpers.showToast(

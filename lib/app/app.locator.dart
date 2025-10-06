@@ -14,6 +14,7 @@ import 'package:stacked_shared/stacked_shared.dart';
 import '../services/audio_handler_impl_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/google_drive_service.dart';
+import '../services/connectivity_service.dart';
 import '../services/playlist_service.dart';
 
 final locator = StackedLocator.instance;
@@ -30,8 +31,10 @@ Future<void> setupLocator({
   locator.registerLazySingleton(() => BottomSheetService());
   locator.registerLazySingleton(() => DialogService());
   locator.registerLazySingleton(() => NavigationService());
-  locator.registerLazySingleton(() => PlaylistService(locator<GoogleDriveService>()));
+  locator.registerLazySingleton(
+      () => PlaylistService(locator<GoogleDriveService>()));
   locator.registerLazySingleton(() => GoogleDriveService());
+  locator.registerLazySingleton(() => ConnectivityService());
   locator.registerLazySingleton(() => AudioPlayerService());
   locator.registerLazySingleton(() => AudioHandlerImplService());
 }
