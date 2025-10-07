@@ -20,6 +20,21 @@ It streams religious audio content (hymns, prayers, sermons) **directly from pub
 
 ---
 
+## Screen Recordings
+### Importing a playlist (1/2)
+
+[![Watch the demo on YouTube Part 0](https://img.youtube.com/vi/UV5UseunWU4/0.jpg)](https://youtube.com/shorts/UV5UseunWU4)
+
+### Importing a playlist (2/2) 
+
+[![Watch the demo on YouTube Part 02](https://img.youtube.com/vi/uF9PpDngq44/0.jpg)](https://youtube.com/shorts/uF9PpDngq44)
+
+### Player Screen 
+[![Watch the demo on YouTube Part 03](https://img.youtube.com/vi/ka0aCXm2634/0.jpg)](https://youtube.com/shorts/ka0aCXm2634)
+
+
+---
+
 ## 📦 Tech stack & main packages
 
 * Flutter
