@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/audio_file.dart';
 import '../models/playlist.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/sort_audio_files.dart';
 
 class GoogleDriveService {
   final api_key = dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
@@ -76,7 +77,8 @@ class GoogleDriveService {
       final filteredFiles =
           files.where((file) => hasAllowedExtension(file['name'])).toList();
 
-      print("🔄 fetchAudioFiles returned ${filteredFiles.length} items after filtering");
+      print(
+          "fetchAudioFiles returned ${filteredFiles.length} items after filtering");
       return filteredFiles.map<Map<String, dynamic>>((file) {
         return {
           'id': file['id'],
@@ -120,7 +122,8 @@ class GoogleDriveService {
           final audioFiles = audioFilesData
               .map((data) => AudioFile.fromJson(data))
               .toList()
-            ..sort((a, b) => a.name.compareTo(b.name)); // ✅ sort here
+            ..sort(
+                audioFileComparator); // numeric-aware ordering for track names
 
           playlists.add(Playlist(
             id: folder['id'],
@@ -141,7 +144,7 @@ class GoogleDriveService {
         final audioFiles = audioFilesData
             .map((data) => AudioFile.fromJson(data))
             .toList()
-          ..sort((a, b) => a.name.compareTo(b.name)); // ✅ sort here too
+          ..sort(audioFileComparator); // numeric-aware ordering for track names
 
         final folderInfo = await fetchFolderInfo(parentFolderId);
         final name = folderInfo['name'] ?? "Unnamed Playlist";
