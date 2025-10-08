@@ -5,6 +5,7 @@ import 'package:divine_stream/app/app.router.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
+import 'package:divine_stream/services/drive_permission_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
@@ -15,6 +16,8 @@ class HomeViewModel extends BaseViewModel {
   final NavigationService _navigationService = locator<NavigationService>();
   final ConnectivityService _connectivityService =
       locator<ConnectivityService>();
+  final DrivePermissionService _drivePermissionService =
+      locator<DrivePermissionService>();
 
   List<Playlist> playlists = [];
 
@@ -91,6 +94,14 @@ class HomeViewModel extends BaseViewModel {
     // Drive imports are network-bound; surface a friendly toast if offline.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
+      setBusy(false);
+      return;
+    }
+    // Stop early when the folder is still private so we surface a specific
+    // sharing hint instead of a generic Drive failure.
+    final canReadFolder =
+        await _drivePermissionService.ensureFolderAccess(folderId);
+    if (!canReadFolder) {
       setBusy(false);
       return;
     }
