@@ -3,6 +3,7 @@ import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/audio_player_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
+import 'package:divine_stream/services/drive_permission_service.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked.dart';
@@ -12,6 +13,8 @@ import '../../../models/audio_file.dart';
 class PlaylistViewModel extends BaseViewModel {
   final AudioPlayerService _audioService = locator<AudioPlayerService>();
   final PlaylistService _playlistService = locator<PlaylistService>();
+  final DrivePermissionService _drivePermissionService =
+      locator<DrivePermissionService>();
   final ConnectivityService _connectivityService =
       locator<ConnectivityService>();
 
@@ -75,6 +78,16 @@ class PlaylistViewModel extends BaseViewModel {
     if (!online) {
       setBusy(false);
       return;
+    }
+
+    if (tracks.isNotEmpty) {
+      final startTrack = tracks[currentIndex];
+      final hasAccess =
+          await _drivePermissionService.ensureFileAccess(startTrack.id);
+      if (!hasAccess) {
+        setBusy(false);
+        return;
+      }
     }
 
     // ✅ Prepare URLs and set the playlist (with error handling)
@@ -141,11 +154,16 @@ class PlaylistViewModel extends BaseViewModel {
     if (!online) {
       return;
     }
+    final track = tracks[index];
+    final hasAccess = await _drivePermissionService.ensureFileAccess(track.id);
+    if (!hasAccess) {
+      return;
+    }
     currentIndex = index;
     notifyListeners();
     // Jump the playlist directly:
     await _audioService.skipToIndex(index);
-    final trackId = tracks[index].id;
+    final trackId = track.id;
     await _playlistService.setLastPlayedTrack(playlist.id, trackId);
     playlist = playlist.copyWith(lastPlayedTrackId: trackId);
     //await _audioService.play();
