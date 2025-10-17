@@ -17,7 +17,7 @@ class PlaylistView extends StatelessWidget {
       onViewModelReady: (vm) => vm.init(playlist),
       builder: (context, vm, child) {
         return Scaffold(
-          appBar: AppBar(title: Text(playlist.name)),
+          appBar: AppBar(title: Text(playlist.name, style: TextStyle(fontSize: 18))),
           body: Padding(
             padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 10),
             child: Column(
