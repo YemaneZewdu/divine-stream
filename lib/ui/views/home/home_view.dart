@@ -1,3 +1,5 @@
+import 'package:divine_stream/models/parent_folder_group.dart';
+import 'package:divine_stream/models/playlist.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_swipe_action_cell/flutter_swipe_action_cell.dart';
 import 'package:stacked/stacked.dart';
@@ -21,7 +23,8 @@ class HomeView extends StackedView<HomeViewModel> {
             ),
             body: viewModel.isBusy
                 ? Center(child: CircularProgressIndicator())
-                : viewModel.playlists.isEmpty
+                : (viewModel.parentFolderGroups.isEmpty &&
+                        viewModel.standalonePlaylists.isEmpty)
                     ? const Center(
                         child: Padding(
                           padding: EdgeInsets.all(16.0),
@@ -32,34 +35,7 @@ class HomeView extends StackedView<HomeViewModel> {
                           ),
                         ),
                       )
-                    : ListView.builder(
-                        itemCount: viewModel.playlists.length,
-                        itemBuilder: (context, index) {
-                          final playlist = viewModel.playlists[index];
-                          return SwipeActionCell(
-                            key: ValueKey(playlist.id),
-                            trailingActions: [
-                              SwipeAction(
-                                /// Use destructive styling so the intent is clear.
-                                color: Colors.red,
-                                icon: Icon(Icons.delete, color: Colors.white),
-                                onTap: (handler) async {
-                                  final removed =
-                                      await viewModel.deletePlaylist(playlist);
-                                  // Close the cell; pass true only when we actually removed it.
-                                  await handler(removed);
-                                },
-                              ),
-                            ],
-                            child: ListTile(
-                              title: Text(playlist.name),
-                              subtitle: Text(
-                                  "${playlist.audioFiles.length} audio files"),
-                              onTap: () => viewModel.openPlaylist(playlist),
-                            ),
-                          );
-                        },
-                      ),
+                    : _HomeListView(viewModel: viewModel),
             floatingActionButton: FloatingActionButton(
               onPressed: viewModel.importFromGoogleDriveFolder,
               child: Icon(Icons.add),
@@ -75,5 +51,79 @@ class HomeView extends StackedView<HomeViewModel> {
   void onViewModelReady(HomeViewModel viewModel) {
     viewModel.initialize();
     super.onViewModelReady(viewModel);
+  }
+}
+
+/// Builds a mixed list where grouped folders and standalone playlists
+/// share one feed.
+class _HomeListView extends StatelessWidget {
+  final HomeViewModel viewModel;
+
+  const _HomeListView({required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    final folderGroups = viewModel.parentFolderGroups;
+    final standalonePlaylists = viewModel.standalonePlaylists;
+
+    final entries = <_HomeListEntry>[
+      for (final group in folderGroups) _HomeListEntry.group(group),
+      for (final playlist in standalonePlaylists)
+        _HomeListEntry.playlist(playlist),
+    ];
+
+    return ListView.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        if (entry.group != null) {
+          final ParentFolderGroup group = entry.group!;
+          return ListTile(
+            key: ValueKey('group-${group.id}'),
+            title: Text(group.name),
+            subtitle: Text('${group.playlists.length} playlists'),
+            trailing: Icon(Icons.chevron_right),
+            onTap: () => viewModel.openParentFolder(group),
+          );
+        }
+
+        final playlist = entry.playlist!;
+        return SwipeActionCell(
+          key: ValueKey(playlist.id),
+          trailingActions: [
+            SwipeAction(
+              // Use destructive styling so the intent is clear to the user.
+              color: Colors.red,
+              icon: Icon(Icons.delete, color: Colors.white),
+              onTap: (handler) async {
+                final removed = await viewModel.deletePlaylist(playlist);
+                // Close the cell; pass true only when we actually removed it.
+                await handler(removed);
+              },
+            ),
+          ],
+          child: ListTile(
+            title: Text(playlist.name),
+            subtitle: Text('${playlist.audioFiles.length} audio files'),
+            onTap: () => viewModel.openPlaylist(playlist),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeListEntry {
+  final ParentFolderGroup? group;
+  final Playlist? playlist;
+
+  _HomeListEntry._({this.group, this.playlist});
+
+  factory _HomeListEntry.group(ParentFolderGroup group) {
+    return _HomeListEntry._(group: group);
+  }
+
+  factory _HomeListEntry.playlist(Playlist playlist) {
+    return _HomeListEntry._(playlist: playlist);
   }
 }

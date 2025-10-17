@@ -107,12 +107,29 @@ class GoogleDriveService {
     }
   }
 
-  /// Import a playlist by fetching audio files from the given folder ID.
-  Future<List<Playlist>> scanNestedFolders(String parentFolderId) async {
+  /// Import playlists under the given folder, tagging child playlists with the root folder.
+  Future<List<Playlist>> scanNestedFolders(
+    String folderId, {
+    String? rootFolderId,
+    String? rootFolderName,
+    bool isRoot = false,
+  }) async {
     final List<Playlist> playlists = [];
 
-    // Step 1: Fetch subfolders
-    final subfolders = await fetchSubFolders(parentFolderId);
+    // Establish parent metadata once so every descendant can reference the top folder.
+    final bool isInitialCall = isRoot || rootFolderId == null;
+    final String effectiveRootId = rootFolderId ?? folderId;
+    var effectiveRootName = rootFolderName;
+
+    if (effectiveRootName == null) {
+      final rootInfo = await fetchFolderInfo(effectiveRootId);
+      effectiveRootName = rootInfo['name'] ?? 'Unnamed Playlist';
+    }
+
+    // Sort subfolders with the shared comparator so nested playlists respect numeric prefixes.
+    final subfolders = await fetchSubFolders(folderId)
+      ..sort((a, b) =>
+          numericAwareNameCompare(a['name'] as String?, b['name'] as String?));
 
     if (subfolders.isNotEmpty) {
       for (final folder in subfolders) {
@@ -125,38 +142,71 @@ class GoogleDriveService {
             ..sort(
                 audioFileComparator); // numeric-aware ordering for track names
 
+          // Tag child playlists with the root metadata so the UI can treat them as part of a folder.
           playlists.add(Playlist(
             id: folder['id'],
             name: folder['name'] ?? 'Unnamed Playlist',
             audioFiles: audioFiles,
+            parentFolderId: effectiveRootId,
+            parentFolderName: effectiveRootName,
           ));
         } else {
-          // Dive deeper recursively
-          final deeperPlaylists = await scanNestedFolders(folder['id']);
+          // Dive deeper recursively so grand-child folders still belong to the root group.
+          final deeperPlaylists = await scanNestedFolders(
+            folder['id'],
+            rootFolderId: effectiveRootId,
+            rootFolderName: effectiveRootName,
+          );
           playlists.addAll(deeperPlaylists);
         }
       }
+
+      if (isInitialCall) {
+        final rootAudioFiles = await fetchAudioFiles(folderId);
+        if (rootAudioFiles.isNotEmpty) {
+          final audioFiles = rootAudioFiles
+              .map((data) => AudioFile.fromJson(data))
+              .toList()
+            ..sort(audioFileComparator);
+
+          // Also surface audio files that live directly under the root folder.
+          playlists.add(Playlist(
+            id: folderId,
+            name: effectiveRootName!,
+            audioFiles: audioFiles,
+            parentFolderId: effectiveRootId,
+            parentFolderName: effectiveRootName,
+          ));
+        }
+      }
     } else {
-      // No subfolders — check current folder for audio files
-      final audioFilesData = await fetchAudioFiles(parentFolderId);
+      final audioFilesData = await fetchAudioFiles(folderId);
 
       if (audioFilesData.isNotEmpty) {
         final audioFiles = audioFilesData
             .map((data) => AudioFile.fromJson(data))
             .toList()
-          ..sort(audioFileComparator); // numeric-aware ordering for track names
+          ..sort(audioFileComparator);
 
-        final folderInfo = await fetchFolderInfo(parentFolderId);
-        final name = folderInfo['name'] ?? "Unnamed Playlist";
+        // Pull the folder name when we are not dealing with the root.
+        final folderInfo = isInitialCall
+            ? {'name': effectiveRootName}
+            : await fetchFolderInfo(folderId);
+        final playlistName = folderInfo['name'] ?? 'Unnamed Playlist';
 
+        // Root-level folders (no subfolders) stay standalone unless metadata marks them as children.
         playlists.add(Playlist(
-          id: parentFolderId,
-          name: name,
+          id: folderId,
+          name: playlistName,
           audioFiles: audioFiles,
+          parentFolderId: isInitialCall ? null : effectiveRootId,
+          parentFolderName: isInitialCall ? null : effectiveRootName,
         ));
       }
     }
 
+    // Return playlists sorted so cache and UI ordering match.
+    playlists.sort((a, b) => numericAwareNameCompare(a.name, b.name));
     return playlists;
   }
 }

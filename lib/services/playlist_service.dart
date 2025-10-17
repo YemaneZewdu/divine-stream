@@ -1,6 +1,7 @@
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/google_drive_service.dart';
 import 'package:divine_stream/utils/sort_audio_files.dart';
+import 'package:get_it/get_it.dart';
 import 'package:hive/hive.dart';
 
 import '../models/audio_file.dart';
@@ -9,7 +10,11 @@ class PlaylistService {
   final GoogleDriveService _googleDriveService;
   final Box _box = Hive.box('playlistsBox');
 
-  PlaylistService(this._googleDriveService);
+  /// Defaults to the shared locator so generated code can still request
+  /// this as a lazy singleton
+  PlaylistService({GoogleDriveService? googleDriveService})
+      : _googleDriveService =
+            googleDriveService ?? GetIt.instance<GoogleDriveService>();
 
   /// Retrieve playlists from Hive (offline mode)
   List<Playlist> getCachedPlaylists() {
@@ -56,8 +61,16 @@ class PlaylistService {
 
   /// Imports all subfolders with audio files under a root folder
   Future<List<Playlist>> importNestedPlaylists(String rootFolderId) async {
-    final nestedPlaylists =
-        await _googleDriveService.scanNestedFolders(rootFolderId);
+    // Pull the root folder's name once so every child playlist can reference it
+    final rootInfo = await _googleDriveService.fetchFolderInfo(rootFolderId);
+    final rootName = rootInfo['name'] ?? 'Unnamed Playlist';
+
+    final nestedPlaylists = await _googleDriveService.scanNestedFolders(
+      rootFolderId,
+      rootFolderId: rootFolderId,
+      rootFolderName: rootName,
+      isRoot: true,
+    );
     final current = getCachedPlaylists();
 
     // Preserve last-played markers when we already have this playlist cached.
@@ -89,9 +102,7 @@ class PlaylistService {
       final rawFiles = await _googleDriveService.fetchAudioFiles(playlist.id);
 
       // 1 Decode into AudioFile
-      final files = rawFiles
-          .map((m) => AudioFile.fromJson(m))
-          .toList();
+      final files = rawFiles.map((m) => AudioFile.fromJson(m)).toList();
 
       // 2 Sort with your comparator
       files.sort(audioFileComparator);
