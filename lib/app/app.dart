@@ -11,6 +11,7 @@ import 'package:divine_stream/services/drive_permission_service.dart';
 import 'package:divine_stream/ui/views/playlist/playlist_view.dart';
 import 'package:divine_stream/services/audio_player_service.dart';
 import 'package:divine_stream/services/audio_handler_impl_service.dart';
+import 'package:divine_stream/ui/views/folder_playlists/folder_playlists_view.dart';
 // @stacked-import
 
 @StackedApp(
@@ -18,6 +19,7 @@ import 'package:divine_stream/services/audio_handler_impl_service.dart';
     MaterialRoute(page: HomeView),
     MaterialRoute(page: StartupView),
     MaterialRoute(page: PlaylistView),
+    MaterialRoute(page: FolderPlaylistsView),
 // @stacked-route
   ],
   dependencies: [

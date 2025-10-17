@@ -8,11 +8,19 @@ class Playlist {
   /// Stores the persisted track ID we should highlight when this playlist opens.
   final String? lastPlayedTrackId;
 
+  /// When populated, this playlist belongs to a grouped parent folder.
+  final String? parentFolderId;
+
+  /// Friendly name shown for the parent folder on the home screen.
+  final String? parentFolderName;
+
   Playlist({
     required this.id,
     required this.name,
     required this.audioFiles,
     this.lastPlayedTrackId,
+    this.parentFolderId,
+    this.parentFolderName,
   });
 
   Playlist copyWith({
@@ -20,12 +28,16 @@ class Playlist {
     String? name,
     List<AudioFile>? audioFiles,
     String? lastPlayedTrackId,
+    String? parentFolderId,
+    String? parentFolderName,
   }) {
     return Playlist(
       id: id ?? this.id,
       name: name ?? this.name,
       audioFiles: audioFiles ?? this.audioFiles,
       lastPlayedTrackId: lastPlayedTrackId ?? this.lastPlayedTrackId,
+      parentFolderId: parentFolderId ?? this.parentFolderId,
+      parentFolderName: parentFolderName ?? this.parentFolderName,
     );
   }
 
@@ -47,6 +59,8 @@ class Playlist {
       name: json['name'] as String? ?? '',
       audioFiles: audioFiles,
       lastPlayedTrackId: json['lastPlayedTrackId'] as String?,
+      parentFolderId: json['parentFolderId'] as String?,
+      parentFolderName: json['parentFolderName'] as String?,
     );
   }
 
@@ -57,6 +71,8 @@ class Playlist {
       'name': name,
       'audioFiles': audioFiles.map((file) => file.toJson()).toList(),
       'lastPlayedTrackId': lastPlayedTrackId,
+      'parentFolderId': parentFolderId,
+      'parentFolderName': parentFolderName,
     };
   }
 
@@ -69,8 +85,7 @@ class Playlist {
   /// Returns the index of the stored last played track, if we still have it.
   int? lastPlayedIndex() {
     if (lastPlayedTrackId == null) return null;
-    final index =
-        audioFiles.indexWhere((file) => file.id == lastPlayedTrackId);
+    final index = audioFiles.indexWhere((file) => file.id == lastPlayedTrackId);
     return index >= 0 ? index : null;
   }
 

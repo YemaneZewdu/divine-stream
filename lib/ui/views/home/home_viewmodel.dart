@@ -4,9 +4,11 @@ import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/app/app.router.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
+import 'package:divine_stream/models/parent_folder_group.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:divine_stream/services/drive_permission_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
+import 'package:divine_stream/utils/sort_audio_files.dart';
 import 'package:flutter/material.dart';
 import 'package:stacked/stacked.dart';
 import 'package:stacked_services/stacked_services.dart';
@@ -20,6 +22,45 @@ class HomeViewModel extends BaseViewModel {
       locator<DrivePermissionService>();
 
   List<Playlist> playlists = [];
+
+  /// Playlists whose `parentFolderId` is null are treated as standalone
+  /// (no grouping UI).
+  List<Playlist> get standalonePlaylists {
+    final items = playlists
+        .where((playlist) => playlist.parentFolderId == null)
+        .toList()
+      ..sort((a, b) => numericAwareNameCompare(a.name, b.name));
+    return items;
+  }
+
+  /// Any playlist with a `parentFolderId` joins a group tile that represents the parent folder.
+  List<ParentFolderGroup> get parentFolderGroups {
+    final grouped = <String, ParentFolderGroup>{};
+
+    for (final playlist in playlists) {
+      final parentId = playlist.parentFolderId;
+      if (parentId == null) continue;
+
+      final existingGroup = grouped[parentId];
+      if (existingGroup == null) {
+        grouped[parentId] = ParentFolderGroup(
+          id: parentId,
+          name: playlist.parentFolderName ?? 'Folder',
+          playlists: [playlist],
+        );
+      } else {
+        existingGroup.playlists.add(playlist);
+      }
+    }
+
+    for (final group in grouped.values) {
+      group.playlists.sort((a, b) => numericAwareNameCompare(a.name, b.name));
+    }
+
+    final groups = grouped.values.toList()
+      ..sort((a, b) => numericAwareNameCompare(a.name, b.name));
+    return groups;
+  }
 
   /// Initializes the home screen.
   /// - Loads cached playlists (if any) and then refreshes them from Google Drive.
@@ -129,6 +170,14 @@ class HomeViewModel extends BaseViewModel {
     _navigationService.navigateTo(
       Routes.playlistView,
       arguments: PlaylistViewArguments(playlist: playlistWithMarker),
+    );
+  }
+
+  /// Opens the second-level page that lists the folder's child playlists.
+  void openParentFolder(ParentFolderGroup group) {
+    _navigationService.navigateTo(
+      Routes.folderPlaylistsView,
+      arguments: FolderPlaylistsViewArguments(group: group),
     );
   }
 
