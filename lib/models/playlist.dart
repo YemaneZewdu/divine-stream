@@ -1,3 +1,5 @@
+import 'package:divine_stream/utils/sort_audio_files.dart';
+
 import 'audio_file.dart';
 
 class Playlist {
@@ -8,10 +10,10 @@ class Playlist {
   /// Stores the persisted track ID we should highlight when this playlist opens.
   final String? lastPlayedTrackId;
 
-  /// When populated, this playlist belongs to a grouped parent folder.
+  ///  When populated, this manifest belongs to a grouped parent folder entry.
   final String? parentFolderId;
 
-  /// Friendly name shown for the parent folder on the home screen.
+  ///  Friendly name shown alongside the parent tile on the home screen.
   final String? parentFolderName;
 
   Playlist({
@@ -54,10 +56,13 @@ class Playlist {
         }).toList() ??
         [];
 
+    final orderedAudioFiles = List<AudioFile>.from(audioFiles)
+      ..sort(audioFileComparator); //  Keep cached playlists sorted like fresh manifests.
+
     return Playlist(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      audioFiles: audioFiles,
+      audioFiles: orderedAudioFiles,
       lastPlayedTrackId: json['lastPlayedTrackId'] as String?,
       parentFolderId: json['parentFolderId'] as String?,
       parentFolderName: json['parentFolderName'] as String?,

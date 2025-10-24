@@ -163,9 +163,12 @@
 
 import 'dart:developer';
 
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/models/audio_file.dart';
+import 'package:divine_stream/services/audio_cache_service.dart';
 import 'package:divine_stream/services/audio_handler_impl_service.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -177,15 +180,19 @@ class AudioPlayerService {
   final AudioHandler _handler = locator<AudioHandler>();
   final ConnectivityService _connectivityService =
       locator<ConnectivityService>();
+  final AudioCacheService _cacheService = locator<AudioCacheService>();
 
   List<MediaItem> _mediaItems = [];
+  List<AudioFile> _audioFiles = [];
+  List<String> _remoteUrls = [];
 
-  // Track the last‐loaded playlist ID. Set this in setPlaylist().
+  //  Track the last-loaded playlist ID so we can skip redundant reloads.
   String? _loadedPlaylistId;
 
-  /// Drive expects an API key for direct media downloads; rebuild the URL with
-  /// the current key at playback time so cached entries do not go stale when the
-  /// key rotates.
+  static const int _prefetchCount = 3; //  Keep the cache a few tracks ahead.
+
+  ///  Rebuild playback URLs so any lingering Drive API keys are replaced
+  ///  with the current value—Firebase links simply pass through unchanged.
   String _buildPlaybackUrl(AudioFile file) {
     final baseUrl = file.url;
     if (baseUrl.isEmpty) return baseUrl;
@@ -195,64 +202,75 @@ class AudioPlayerService {
       return baseUrl;
     }
 
+    if (baseUrl.contains('firebasestorage.googleapis.com')) {
+      //  Firebase Storage URLs already bake in the security token; avoid
+      //  appending the Drive key or we risk unnecessary 403 responses.
+      return baseUrl;
+    }
+
     try {
       final uri = Uri.parse(baseUrl);
       final params = Map<String, String>.from(uri.queryParameters);
       params['key'] = apiKey;
-      return uri.replace(queryParameters: params).toString();
+      final newUrl = uri.replace(queryParameters: params).toString();
+      log('[AudioPlayerService] Resolved playback URL for ${file.id}: $newUrl');
+      return newUrl;
     } catch (_) {
       return baseUrl;
     }
   }
 
-  /// Returns true if setPlaylist(...) was already called with this same ID
+  ///  Used by the playlist screen to skip reloading when we already have the same queue in memory.
   bool isPlaylistLoaded(String id) => _loadedPlaylistId == id;
 
-  /// Returns true if the handler has actually loaded a playlist and is ready
+  /// Returns true once the AudioHandler has an active queue.
   bool get isReady {
     // For simplicity, treat “ready” as “we have at least one MediaItem and player isn’t idle”
     // You could also inspect handler.playbackState.processingState if you expose it.
     return _loadedPlaylistId != null;
   }
 
-  /// Expose just_audio’s processingState via AudioHandlerImplService
+  ///  Expose just_audio’s processing state so the UI
+  ///  can toggle loading indicators.
   Stream<ProcessingState> get processingStateStream =>
       (_handler as AudioHandlerImplService).processingStateStream;
 
-  // Load and prepare a playlist from a list of audio URLs
-  Future<void> setPlaylist(List<AudioFile> audioFiles,
-      {int startIndex = 0}) async {
-    print("\n in setPlaylist 1\n");
+  //  Load and prepare a playlist; we keep the manifest ID
+  //  so re-opening avoids rebuilding the queue.
+  Future<void> setPlaylist(
+    List<AudioFile> audioFiles, {
+    int startIndex = 0,
+    required String playlistId,
+  }) async {
     // Loading a remote playlist without connectivity causes confusing errors.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       return;
     }
-    // Create media items with metadata
-    _mediaItems = audioFiles.map((file) {
-      final playbackUrl = _buildPlaybackUrl(file);
-      log('Playback URL resolved for ${file.name}: $playbackUrl');
-      return MediaItem(
-        id: playbackUrl,
-        title: file.name, // ✅ Use real name from AudioFile
-        artist: 'Streaming Hymns',
-        album: 'Imported Playlist',
-        duration: Duration.zero, // optional if not known
-        // artUri: optional artwork per track if needed
-      );
-    }).toList();
 
-    // Load into AudioHandlerImpl
-    await (_handler as dynamic)
-        .loadPlaylist(_mediaItems); // casting to call custom method
+    _audioFiles = audioFiles;
+    _remoteUrls = [
+      for (final file in audioFiles) _buildPlaybackUrl(file),
+    ];
 
-    // Seek to the first track
+    _mediaItems = [
+      for (var i = 0; i < audioFiles.length; i++)
+        MediaItem(
+          id: _remoteUrls[i],
+          title: audioFiles[i].name,
+          artist: 'Streaming Hymns',
+          album: 'Imported Playlist',
+          duration: Duration.zero,
+        )
+    ];
+
+    await (_handler as AudioHandlerImplService).loadPlaylist(_mediaItems);
     await _handler.skipToQueueItem(startIndex);
 
-    //await _handler.play(); // this line starts playback
+    _loadedPlaylistId = playlistId;
 
-    // Now that it’s loaded, remember which playlist is active:
-    _loadedPlaylistId = "playlist‐${audioFiles.hashCode}";
+    await _prepareLocalAt(startIndex);
+    _prefetchAround(startIndex + 1);
   }
 
   Future<void> play() => _handler.play();
@@ -260,30 +278,86 @@ class AudioPlayerService {
   Future<void> stop() => _handler.stop();
   Future<void> seek(Duration position) => _handler.seek(position);
   Future<void> skipToIndex(int index) async {
-    // Skipping fetches a new Drive stream; protect against offline actions.
+    //  Skipping fetches a new remote stream; guard against offline actions.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       return;
     }
+    await _prepareLocalAt(index);
+    log('[AudioPlayerService] skipToIndex -> $index');
     await _handler.skipToQueueItem(index);
+    _prefetchAround(index + 1);
   }
 
   Future<void> playNext() async {
-    // Skipping fetches a new Drive stream; protect against offline actions.
+    //  Skipping fetches a new remote stream; guard against offline actions.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       return;
     }
+    final state = _handler.playbackState.value;
+    final nextIndex = (state.queueIndex ?? 0) + 1;
+    await _prepareLocalAt(nextIndex);
+    log('[AudioPlayerService] playNext requested');
     await _handler.skipToNext();
+    _prefetchAround(nextIndex + 1);
   }
 
   Future<void> playPrevious() async {
-    // Skipping fetches a new Drive stream; protect against offline actions.
+    //  Skipping fetches a new remote stream; guard against offline actions.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       return;
     }
+    final state = _handler.playbackState.value;
+    final previousIndex = (state.queueIndex ?? 0) - 1;
+    await _prepareLocalAt(previousIndex);
+    log('[AudioPlayerService] playPrevious requested');
     await _handler.skipToPrevious();
+  }
+
+  Future<void> prepareTrack(int index) => _prepareLocalAt(index);
+
+  void _prefetchAround(int index) {
+    if (_audioFiles.isEmpty) return;
+
+    final start = index < 0 ? 0 : index;
+    if (start >= _audioFiles.length) return;
+
+    Future(() async {
+      //  Warm the cache for the next few tracks so playback stays responsive
+      //  even under quota pressure.
+      await _cacheService.prefetch(
+        _audioFiles,
+        _remoteUrls,
+        startIndex: start,
+        count: _prefetchCount,
+      );
+    });
+  }
+
+  Future<void> _prepareLocalAt(int index) async {
+    if (index < 0 || index >= _audioFiles.length) {
+      return;
+    }
+
+    //  Swap the current queue item to the cached file once the download finishes.
+    final cachedPath =
+        await _cacheService.ensureCached(_audioFiles[index], _remoteUrls[index]);
+    if (cachedPath == null) {
+      return;
+    }
+
+    final localUri = Uri.file(cachedPath);
+    final currentItem = _mediaItems[index];
+    if (currentItem.id == localUri.toString()) {
+      return;
+    }
+
+    final updatedItem = currentItem.copyWith(id: localUri.toString());
+    await (_handler as AudioHandlerImplService)
+        .swapSourceAt(index, localUri, updatedItem);
+    _mediaItems[index] = updatedItem;
   }
 
   /// Streams for UI bindings

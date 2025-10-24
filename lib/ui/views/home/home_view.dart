@@ -8,39 +8,33 @@ import 'home_viewmodel.dart';
 class HomeView extends StackedView<HomeViewModel> {
   @override
   Widget builder(BuildContext context, HomeViewModel viewModel, Widget? child) {
-    return ViewModelBuilder<HomeViewModel>.reactive(
-      viewModelBuilder: () => HomeViewModel(),
-      onViewModelReady: (viewModel) => viewModel.initialize(),
-      builder: (context, viewModel, child) {
-        return Scaffold(
-            appBar: AppBar(
-              title: Text("Divine Audio Streaming"),
-              actions: [
-                IconButton(
-                    icon: Icon(Icons.refresh),
-                    onPressed: () => viewModel.refreshAllPlaylists()),
-              ],
-            ),
-            body: viewModel.isBusy
-                ? Center(child: CircularProgressIndicator())
-                : (viewModel.parentFolderGroups.isEmpty &&
-                        viewModel.standalonePlaylists.isEmpty)
-                    ? const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Text(
-                            "No playlists yet.\nTap + to import from Google Drive.",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      )
-                    : _HomeListView(viewModel: viewModel),
-            floatingActionButton: FloatingActionButton(
-              onPressed: viewModel.importFromGoogleDriveFolder,
-              child: Icon(Icons.add),
-            ));
-      },
+    final hasContent =
+        viewModel.parentFolderGroups.isNotEmpty || viewModel.standalonePlaylists.isNotEmpty;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Divine Audio Streaming'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: viewModel.refreshAllPlaylists,
+          ),
+        ],
+      ),
+      body: viewModel.isBusy
+          ? const Center(child: CircularProgressIndicator())
+          : hasContent
+              ? _HomeListView(viewModel: viewModel)
+              : const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      'No playlists yet. Upload tracks to Firebase Storage to populate your library.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
     );
   }
 
@@ -49,8 +43,8 @@ class HomeView extends StackedView<HomeViewModel> {
 
   @override
   void onViewModelReady(HomeViewModel viewModel) {
-    viewModel.initialize();
     super.onViewModelReady(viewModel);
+    viewModel.initialize();
   }
 }
 
@@ -66,10 +60,11 @@ class _HomeListView extends StatelessWidget {
     final folderGroups = viewModel.parentFolderGroups;
     final standalonePlaylists = viewModel.standalonePlaylists;
 
+    //  Build a single feed that first lists parent folders, followed by
+    //  standalone playlists that have no children.
     final entries = <_HomeListEntry>[
       for (final group in folderGroups) _HomeListEntry.group(group),
-      for (final playlist in standalonePlaylists)
-        _HomeListEntry.playlist(playlist),
+      for (final playlist in standalonePlaylists) _HomeListEntry.playlist(playlist),
     ];
 
     return ListView.builder(
@@ -78,6 +73,7 @@ class _HomeListView extends StatelessWidget {
         final entry = entries[index];
         if (entry.group != null) {
           final ParentFolderGroup group = entry.group!;
+          // Parent folders route to a secondary screen where the child playlists live.
           return ListTile(
             key: ValueKey('group-${group.id}'),
             title: Text(group.name),
@@ -92,7 +88,7 @@ class _HomeListView extends StatelessWidget {
           key: ValueKey(playlist.id),
           trailingActions: [
             SwipeAction(
-              // Use destructive styling so the intent is clear to the user.
+              // Use destructive styling so the deletion affordance is unambiguous.
               color: Colors.red,
               icon: Icon(Icons.delete, color: Colors.white),
               onTap: (handler) async {

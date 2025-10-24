@@ -6,7 +6,6 @@ import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/models/parent_folder_group.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
-import 'package:divine_stream/services/drive_permission_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
 import 'package:divine_stream/utils/sort_audio_files.dart';
 import 'package:flutter/material.dart';
@@ -18,13 +17,10 @@ class HomeViewModel extends BaseViewModel {
   final NavigationService _navigationService = locator<NavigationService>();
   final ConnectivityService _connectivityService =
       locator<ConnectivityService>();
-  final DrivePermissionService _drivePermissionService =
-      locator<DrivePermissionService>();
-
   List<Playlist> playlists = [];
 
-  /// Playlists whose `parentFolderId` is null are treated as standalone
-  /// (no grouping UI).
+  /// Any manifest without `parentFolderId` represents a top-level folder,
+  ///  so we surface it directly on the home list.
   List<Playlist> get standalonePlaylists {
     final items = playlists
         .where((playlist) => playlist.parentFolderId == null)
@@ -33,7 +29,8 @@ class HomeViewModel extends BaseViewModel {
     return items;
   }
 
-  /// Any playlist with a `parentFolderId` joins a group tile that represents the parent folder.
+  ///  Manifests tagged with `parentFolderId` belong under a grouped parent
+  ///  tile—this keeps sub-folders off the root screen.
   List<ParentFolderGroup> get parentFolderGroups {
     final grouped = <String, ParentFolderGroup>{};
 
@@ -62,8 +59,7 @@ class HomeViewModel extends BaseViewModel {
     return groups;
   }
 
-  /// Initializes the home screen.
-  /// - Loads cached playlists (if any) and then refreshes them from Google Drive.
+  ///  Kick off with cached data for instant paint, then sync against Firebase.
   Future<void> initialize() async {
     setBusy(true);
     // Load cached playlists for a quick UI update.
@@ -71,13 +67,14 @@ class HomeViewModel extends BaseViewModel {
     notifyListeners();
 
     setBusy(false);
+    await syncFromFirebase();
   }
 
-  /// Refreshes all playlists (re-syncs from Google Drive)
+  //  Pull a fresh snapshot from Firestore and cache the result locally.
   Future<void> refreshAllPlaylists() async {
-    log("\n in refreshAllPlaylists\n ");
     setBusy(true);
-    // Quick exit when the device reports no connection so we avoid Drive errors.
+    // Bail out early if we have no connection;
+    // Firestore sync would fail anyway.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       setBusy(false);
@@ -96,64 +93,22 @@ class HomeViewModel extends BaseViewModel {
     setBusy(false);
   }
 
-  /// Prompts user to paste a folder link and imports it
-  Future<void> importFromGoogleDriveFolder() async {
-    final controller = TextEditingController();
-
-    final result = await showDialog<String>(
-      context: StackedService.navigatorKey!.currentContext!,
-      builder: (context) => AlertDialog(
-        title: Text("Import Playlist"),
-        content: TextField(
-          controller: controller,
-          decoration: InputDecoration(hintText: "Paste folder link here"),
-        ),
-        actions: [
-          TextButton(
-            child: Text("Cancel"),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          TextButton(
-            child: Text("Import"),
-            onPressed: () => Navigator.of(context).pop(controller.text),
-          ),
-        ],
-      ),
-    );
-
-    if (result == null || result.trim().isEmpty) return;
-
-    final folderId = Helpers.extractFolderIdFromUrl(result.trim());
-    if (folderId == null) {
-      Helpers.showToast(
-        "Invalid folder link.",
-      );
-      return;
-    }
-
+  Future<void> syncFromFirebase() async {
     setBusy(true);
-    // Drive imports are network-bound; surface a friendly toast if offline.
+    // Firebase now acts as the single source of truth—no Drive dialog needed.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       setBusy(false);
       return;
     }
-    // Stop early when the folder is still private so we surface a specific
-    // sharing hint instead of a generic Drive failure.
-    final canReadFolder =
-        await _drivePermissionService.ensureFolderAccess(folderId);
-    if (!canReadFolder) {
-      setBusy(false);
-      return;
-    }
     try {
       final newPlaylists =
-          await _playlistService.importNestedPlaylists(folderId);
-      playlists.addAll(newPlaylists);
+          await _playlistService.importNestedPlaylists('firebase');
+      playlists = newPlaylists;
       notifyListeners();
-      Helpers.showToast("Playlist(s) imported!", backgroundColor: Colors.green);
+      Helpers.showToast("Playlist(s) synced!", backgroundColor: Colors.green);
     } catch (e) {
-      Helpers.showToast("Import failed: ${Helpers.shorten(e.toString())}");
+      Helpers.showToast("Sync failed: ${Helpers.shorten(e.toString())}");
     }
     setBusy(false);
   }

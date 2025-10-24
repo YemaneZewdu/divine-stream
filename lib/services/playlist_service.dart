@@ -1,22 +1,19 @@
 import 'package:divine_stream/models/playlist.dart';
-import 'package:divine_stream/services/google_drive_service.dart';
-import 'package:divine_stream/utils/sort_audio_files.dart';
+import 'package:divine_stream/services/firebase_playlist_loader.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive/hive.dart';
 
-import '../models/audio_file.dart';
-
 class PlaylistService {
-  final GoogleDriveService _googleDriveService;
+  final FirebasePlaylistLoader _firebasePlaylistLoader;
   final Box _box = Hive.box('playlistsBox');
 
-  /// Defaults to the shared locator so generated code can still request
-  /// this as a lazy singleton
-  PlaylistService({GoogleDriveService? googleDriveService})
-      : _googleDriveService =
-            googleDriveService ?? GetIt.instance<GoogleDriveService>();
+  // Resolve the Firebase loader via locator so generated code can keep
+  // requesting this service without threading dependencies around.
+  PlaylistService({FirebasePlaylistLoader? firebasePlaylistLoader})
+      : _firebasePlaylistLoader =
+            firebasePlaylistLoader ?? GetIt.instance<FirebasePlaylistLoader>();
 
-  /// Retrieve playlists from Hive (offline mode)
+  /// Retrieve playlists from Hive so the UI renders instantly offline.
   List<Playlist> getCachedPlaylists() {
     final List<dynamic>? raw = _box.get('playlists');
     if (raw == null) return [];
@@ -30,7 +27,7 @@ class PlaylistService {
     }).toList();
   }
 
-  /// Save playlists to Hive
+  /// Persist the latest manifest snapshot for offline rehydration.
   Future<void> _savePlaylists(List<Playlist> playlists) async {
     List<Map<String, dynamic>> jsonData =
         playlists.map((playlist) => playlist.toJson()).toList();
@@ -44,7 +41,7 @@ class PlaylistService {
         .lastPlayedTrackId;
   }
 
-  /// Persists the most recently played track for the given playlist.
+  /// Persist the most recently played track so reopening highlights it.
   Future<void> setLastPlayedTrack(String playlistId, String trackId) async {
     final playlists = getCachedPlaylists();
     var didUpdate = false;
@@ -59,63 +56,21 @@ class PlaylistService {
     }
   }
 
-  /// Imports all subfolders with audio files under a root folder
+  /// Imports the entire manifest from Firebase; the root id is ignored now.
   Future<List<Playlist>> importNestedPlaylists(String rootFolderId) async {
-    // Pull the root folder's name once so every child playlist can reference it
-    final rootInfo = await _googleDriveService.fetchFolderInfo(rootFolderId);
-    final rootName = rootInfo['name'] ?? 'Unnamed Playlist';
-
-    final nestedPlaylists = await _googleDriveService.scanNestedFolders(
-      rootFolderId,
-      rootFolderId: rootFolderId,
-      rootFolderName: rootName,
-      isRoot: true,
-    );
-    final current = getCachedPlaylists();
-
-    // Preserve last-played markers when we already have this playlist cached.
-    final enriched = nestedPlaylists.map((playlist) {
-      final existing = current.firstWhere(
-        (cached) => cached.id == playlist.id,
-        orElse: Playlist.empty,
-      );
-      return playlist.copyWith(
-        lastPlayedTrackId: existing.lastPlayedTrackId,
-      );
-    }).toList();
-
-    final merged = <String, Playlist>{
-      for (final playlist in current) playlist.id: playlist,
-      for (final playlist in enriched) playlist.id: playlist,
-    };
-
-    await _savePlaylists(merged.values.toList());
-    return enriched;
+    // The Firebase manifest already contains the full playlist list, so the
+    // `rootFolderId` argument is ignored and we fetch everything instead.
+    final firebasePlaylists = await _firebasePlaylistLoader.fetchPlaylists();
+    return await _mergeAndPersist(firebasePlaylists);
   }
 
-  /// Refreshes all playlists by re-fetching their contents from Drive
+  /// Force-refresh playlists by rebuilding them from the manifest.
   Future<List<Playlist>> refreshAll() async {
-    final current = getCachedPlaylists();
-    final refreshed = <Playlist>[];
-
-    for (final playlist in current) {
-      final rawFiles = await _googleDriveService.fetchAudioFiles(playlist.id);
-
-      // 1 Decode into AudioFile
-      final files = rawFiles.map((m) => AudioFile.fromJson(m)).toList();
-
-      // 2 Sort with your comparator
-      files.sort(audioFileComparator);
-
-      // 3 Build the updated Playlist
-      refreshed.add(playlist.copyWith(audioFiles: files));
-    }
-
-    await _savePlaylists(refreshed);
-    return refreshed;
+    final firebasePlaylists = await _firebasePlaylistLoader.fetchPlaylists();
+    return await _mergeAndPersist(firebasePlaylists);
   }
 
-  /// Removes a playlist (and its cached state) from local storage.
+  /// Remove a playlist (plus cached metadata) from local storage.
   Future<void> deletePlaylist(String playlistId) async {
     final playlists = getCachedPlaylists();
     final updated =
@@ -126,5 +81,30 @@ class PlaylistService {
     }
 
     await _savePlaylists(updated);
+  }
+
+  Future<List<Playlist>> _mergeAndPersist(List<Playlist> incoming) async {
+    final current = getCachedPlaylists();
+
+    // Carry over persisted metadata (e.g. last played track) before replacing the cache.
+    final enriched = incoming.map((playlist) {
+      final existing = current.firstWhere(
+        (cached) => cached.id == playlist.id,
+        orElse: Playlist.empty,
+      );
+      return playlist.copyWith(
+        lastPlayedTrackId: existing.lastPlayedTrackId,
+      );
+    }).toList();
+
+    // Merge by id so we ignore duplicates that may still live in the cache.
+    final merged = <String, Playlist>{
+      for (final playlist in current) playlist.id: playlist,
+      for (final playlist in enriched) playlist.id: playlist,
+    };
+
+    final mergedList = merged.values.toList();
+    await _savePlaylists(mergedList);
+    return mergedList;
   }
 }

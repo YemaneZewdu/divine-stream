@@ -45,12 +45,14 @@ class AudioHandlerImplService extends BaseAudioHandler
     });
 
     //  Error handler
-    _player.playbackEventStream.listen((event) {}, onError: (Object error, StackTrace stackTrace) {
+    _player.playbackEventStream.listen((event) {},
+        onError: (Object error, StackTrace stackTrace) {
       Helpers.showToast('Audio error occurred: $error');
     });
   }
 
-  /// Set a full playlist of tracks and start playback
+  ///  Seed just_audio with remote URLs first;
+  ///  cached swaps will replace them lazily
   Future<void> loadPlaylist(List<MediaItem> items) async {
     _mediaItems = items;
     queue.add(items); // tell the system what’s in the queue
@@ -61,7 +63,8 @@ class AudioHandlerImplService extends BaseAudioHandler
       log('AudioHandler loading ${item.id}');
     }
 
-    final sources = items.map((item) => AudioSource.uri(Uri.parse(item.id))).toList();
+    final sources =
+        items.map((item) => AudioSource.uri(Uri.parse(item.id))).toList();
     _playlist.clear();
     _playlist.addAll(sources);
 
@@ -70,6 +73,31 @@ class AudioHandlerImplService extends BaseAudioHandler
     mediaItem.add(_mediaItems[0]);
     // Let the caller decide when to start playback so we can seek to the saved
     // track index first; auto-play happens via view model after skipToQueueItem.
+  }
+
+  // Swap the underlying audio source for a queue item so we can point at a
+  // cached file once it finishes downloading.
+  Future<void> swapSourceAt(int index, Uri uri, MediaItem updatedItem) async {
+    if (index < 0 || index >= _mediaItems.length) {
+      return;
+    }
+
+    final wasCurrent = _player.currentIndex == index;
+
+    await _playlist.removeAt(index);
+    await _playlist.insert(index, AudioSource.uri(uri));
+
+    _mediaItems[index] = updatedItem;
+    queue.add(List<MediaItem>.from(_mediaItems));
+
+    if (wasCurrent) {
+      //  Force just_audio to re-open the swapped source so iOS stops
+      //  pointing at the removed remote URL.
+      await _player.seek(Duration.zero, index: index);
+      mediaItem.add(updatedItem);
+    } else if (_player.currentIndex == index) {
+      mediaItem.add(updatedItem);
+    }
   }
 
   /// Expose the raw processingState from just_audio
@@ -112,11 +140,9 @@ class AudioHandlerImplService extends BaseAudioHandler
     // No-op here, but returning ensures audio_service doesn’t stop playback.
   }
 
-
   void _broadcastState(PlayerState state) {
     final isPlaying = state.playing;
     final processingState = state.processingState;
-    log('\n Audio playing state: $isPlaying');
 
     playbackState.add(PlaybackState(
       controls: [

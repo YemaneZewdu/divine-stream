@@ -1,5 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/services/audio_handler_impl_service.dart';
+import 'firebase_options.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:divine_stream/app/app.bottomsheets.dart';
 import 'package:divine_stream/app/app.dialogs.dart';
@@ -14,6 +16,12 @@ Future<void> main() async {
 
   // Load environment variables
   await dotenv.load(fileName: ".env");
+
+  // Firebase is used for playlist manifests and
+  // needs to be ready before the app runs.
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Initialize Hive and open the storage directory
   await Hive.initFlutter();

@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
@@ -39,16 +41,22 @@ class DrivePermissionService {
     final response = await http.get(uri);
 
     if (response.statusCode == 200) {
+      log('[DrivePermissionService] $resourceId accessible (200)');
       return true;
     }
 
     if (response.statusCode == 403 || response.statusCode == 404) {
+      final bodyPreview = response.body.length > 200
+          ? '${response.body.substring(0, 200)}...'
+          : response.body;
+      log('[DrivePermissionService] $resourceId denied (${response.statusCode}): $bodyPreview');
       Helpers.showToast(
         'Update the Google Drive sharing permissions and try again.',
       );
       return false;
     }
 
+    log('[DrivePermissionService] $resourceId unexpected status ${response.statusCode}: ${response.body}');
     // Other errors (timeouts, 5xx) fall back to the existing error handlers so
     // unexpected issues aren't hidden behind the sharing toast.
     return true;

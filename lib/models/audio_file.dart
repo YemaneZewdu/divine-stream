@@ -12,8 +12,8 @@ class AudioFile {
   });
 
   factory AudioFile.fromJson(Map<String, dynamic> json) {
-    // If older cache entries still include an API key query param, strip it so
-    // the URL stays valid even after the key changes.
+    // Strip legacy Drive API keys from cached URLs
+    // so Firebase links remain valid
     String sanitizedUrl = json['url'] ?? '';
     try {
       final uri = Uri.parse(sanitizedUrl);
@@ -23,7 +23,8 @@ class AudioFile {
         sanitizedUrl = uri.replace(queryParameters: filteredParams).toString();
       }
     } catch (_) {
-      // Leave the original value if parsing fails; playback will surface the error.
+      // Leave the original value if parsing fails;
+      // playback will surface the error
     }
 
     return AudioFile(
@@ -35,7 +36,8 @@ class AudioFile {
   }
 
 
-  /// Removes the trailing file extension so track titles are cleaner in the UI.
+  ///  Remove trailing file extensions so the playlist UI
+  ///  shows human-friendly titles
   static String _stripExtension(String? name) {
     if (name == null || name.isEmpty) return '';
     final index = name.lastIndexOf('.');

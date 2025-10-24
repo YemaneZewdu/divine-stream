@@ -28,8 +28,11 @@ class PlaylistView extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final track = vm.tracks[index];
                       final isActive = index == vm.currentIndex;
+                      final title = track.title.isNotEmpty
+                          ? track.title
+                          : track.name; // Fall back gracefully if older caches miss `title`.
                       return ListTile(
-                        title: Text(track.name),
+                        title: Text(title),
                         tileColor: isActive
                             ? Theme.of(context)
                                 .colorScheme

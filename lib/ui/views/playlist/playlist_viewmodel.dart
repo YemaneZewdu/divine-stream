@@ -3,7 +3,6 @@ import 'package:divine_stream/helpers/app_helpers.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/audio_player_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
-import 'package:divine_stream/services/drive_permission_service.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked.dart';
@@ -13,8 +12,6 @@ import '../../../models/audio_file.dart';
 class PlaylistViewModel extends BaseViewModel {
   final AudioPlayerService _audioService = locator<AudioPlayerService>();
   final PlaylistService _playlistService = locator<PlaylistService>();
-  final DrivePermissionService _drivePermissionService =
-      locator<DrivePermissionService>();
   final ConnectivityService _connectivityService =
       locator<ConnectivityService>();
 
@@ -73,26 +70,20 @@ class PlaylistViewModel extends BaseViewModel {
 
     setBusy(true);
 
-    // Loading a playlist streams from Drive; abort cleanly if we are offline.
+    // Loading audio from Firebase still requires connectivity; abort cleanly if offline.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
       setBusy(false);
       return;
     }
 
-    if (tracks.isNotEmpty) {
-      final startTrack = tracks[currentIndex];
-      final hasAccess =
-          await _drivePermissionService.ensureFileAccess(startTrack.id);
-      if (!hasAccess) {
-        setBusy(false);
-        return;
-      }
-    }
-
     // ✅ Prepare URLs and set the playlist (with error handling)
     try {
-      await _audioService.setPlaylist(tracks, startIndex: currentIndex);
+      await _audioService.setPlaylist(
+        tracks,
+        startIndex: currentIndex,
+        playlistId: playlist.id, // Preserve playlist identity for cache re-use.
+      );
       //await _audioService.play();
     } catch (e) {
       print(e.toString());
@@ -107,7 +98,7 @@ class PlaylistViewModel extends BaseViewModel {
 
   void _subscribeToStreams() {
     _audioService.playerStateStream.listen((playing) {
-      print('\n📡 ViewModel received playing: $playing');
+      //print('\n📡 ViewModel received playing: $playing');
       isPlaying = playing;
       notifyListeners();
     });
@@ -155,10 +146,7 @@ class PlaylistViewModel extends BaseViewModel {
       return;
     }
     final track = tracks[index];
-    final hasAccess = await _drivePermissionService.ensureFileAccess(track.id);
-    if (!hasAccess) {
-      return;
-    }
+    await _audioService.prepareTrack(index);
     currentIndex = index;
     notifyListeners();
     // Jump the playlist directly:
