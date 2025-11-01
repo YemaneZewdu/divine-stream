@@ -15,7 +15,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
-  await dotenv.load(fileName: ".env");
+    // await dotenv.load(fileName: ".env");
 
   // Firebase is used for playlist manifests and
   // needs to be ready before the app runs.
