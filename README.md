@@ -1,146 +1,83 @@
 # Divine Stream - Audio Streaming App
 
-## 🎵 What is this project?
+## Overview
+Divine Stream is a Flutter app for iOS and Android that delivers hymns, sermons, and other spiritual audio content. The legacy Google Drive integration 
+has been replaced with a Firebase-backed pipeline, so playlists and streamable URLs now come from Firebase instead of public Drive folders. 
+The app keeps its MVVM structure via Stacked, offers background playback, and continues to support offline-friendly metadata caching.
 
-**Divine Stream** is a Flutter mobile app (Android & iOS) built with the **Stacked** architecture.
-It streams religious audio content (hymns, prayers, sermons) **directly from public Google Drive folders**. Each Drive **subfolder becomes a playlist**; audio streams from Drive. The app supports background playback with lock-screen / notification / Bluetooth controls.
+## Key Highlights
+- Streams audio from Firebase-managed manifests (Firestore + Cloud Storage URLs)
+- Automatic playlist organisation for nested folders
+- Background playback with lock-screen and Bluetooth controls
+- Offline metadata cache for fast launches and browsing without network
+- Clean MVVM architecture with testable services and view models
 
----
+## Firebase Backend
+- **Firestore manifests**: Cloud Functions populate a `manifests` collection; each document carries playlist metadata, 
+    parent relationships, and signed stream URLs.
+- **Cloud Storage delivery**: Audio files are stored in Firebase Storage; signed URLs are exposed through the manifests for secure playback.
+- **Service layer**: `FirebasePlaylistLoader` converts manifest documents into the legacy `Playlist` model so the existing UI and caching 
+    layers continue to work.
 
-## ✨ Features
+## Core Features
+### Playlist & Library Management
+- Three-level navigation (Home → Folder → Playlist)
+- Numeric-aware sorting so "Track 2" appears before "Track 10"
+- Swipe-to-delete, pull-to-refresh, and cached hierarchy for offline browsing
 
-* Import a Google Drive folder (paste folder link) → creates a playlist.
-* Support nested subfolders (each subfolder = playlist).
-* Stream audio from Drive (direct `alt=media` links).
-* Playback controls: Play / Pause / Next / Previous / Seek +/-10s, slider with buffering state.
-* Auto-advance to the next track when the current finishes.
-* Lock-screen/notification + Bluetooth controls (play/pause/next/prev).
-* Refresh playlists to fetch newly added audio files.
-* Offline playlist metadata via Hive (audio itself is streamed).
+### Audio Experience
+- just_audio + audio_service for seamless playback and background control
+- Lock-screen, Control Center, and Bluetooth transport actions
+- Resume last position and auto-advance to the next track
 
----
+### Reliability & UX
+- Hive-backed metadata cache for instant startup
+- Connectivity awareness with graceful offline messaging
+- Consistent MVVM organisation for maintainability
 
-## 📦 Tech stack & main packages
+## Tech Stack
+- **Framework**: Flutter (Dart 3+)
+- **Architecture**: Stacked (GetIt DI, RxDart helpers)
+- **Audio**: just_audio, audio_service
+- **Storage**: Hive, hive_flutter
+- **Firebase**: cloud_firestore, firebase_core, firebase_storage (via generated manifests)
+- **Utilities**: connectivity_plus, stacked_services, fluttertoast, flutter_native_splash
+- **Tooling**: build_runner, stacked_generator, mockito
 
-* Flutter
-* Architecture: **Stacked** (View / ViewModel / Services)
-* Background & lock screen: **audio\_service**
-* Audio playback: **just\_audio**
-* Google Drive access: simple REST calls (public folders) via `http`
-* Local cache: **hive** + **hive\_flutter**
-* DI / service locator: **get\_it** (via Stacked generator)
-* Other useful packages: `stacked_services`, `stacked_cli`
----
-
-## 📁 Project structure (high level)
-
+## Project Structure
 ```
-lib/
-├── main.dart
-├── app/                # Stacked app config, locator, router
-├── models/             # AudioFile, Playlist
-├── services/           # Audio handler, audio player wrapper, Drive + playlist services
-├── ui/
-│   ├── views/          # Home, Playlist, Player
-│   └── widgets/        # Playback controls, dialogs
-└── helpers/
+divine_stream/
+├── lib/
+│   ├── main.dart
+│   ├── app/                    # Stacked configuration (locators, routes, dialogs)
+│   ├── models/                 # AudioFile, Playlist, ParentFolderGroup entities
+│   ├── services/
+│   │   ├── firebase_playlist_loader.dart  # Fetch Firebase manifests
+│   │   ├── playlist_service.dart          # Cache + domain orchestration
+│   │   ├── audio_player_service.dart      # Playback facade
+│   │   ├── audio_handler_impl_service.dart# Background handler
+│   │   ├── audio_cache_service.dart       # Hive integration
+│   │   └── connectivity_service.dart      # Network monitoring
+│   ├── ui/                    # Views, dialogs, bottom sheets, shared widgets
+│   ├── helpers/               # App helpers and colour palette
+│   └── utils/                 # Sorting + miscellaneous utilities
+├── ios/, android/, web/, macos/, windows/, linux/  # Platform targets
+├── assets/                    # Artwork and static assets
+├── TECHNICAL_DOCUMENTATION.md
+├── FEATURES_SUMMARY.md
+├── INTERVIEW_GUIDE.md
+├── pubspec.yaml
+└── README.md
 ```
 
----
+## Getting Started
+1. Install Flutter (see `flutter --version` requirement in the docs).
+2. Run `flutter pub get`.
+3. Configure Firebase: download the `google-services.json` / `GoogleService-Info.plist` files and place them under 
+   `android/app` and `ios/Runner` respectively.
+4. Ensure the Cloud Function that publishes playlist manifests is deployed and the `manifests` collection is populated.
+5. Run `flutter run` (or build via Xcode/Android Studio) and sign in with a Firebase user that has access to the manifests.
 
-## ⚙️ Configuration & setup
-
-### Prerequisites
-
-* Flutter SDK (stable)
-* Xcode (macOS, for iOS) and/or Android Studio
-* A Google Cloud project with **Google Drive API enabled** (see below)
-
-### Google Drive (public folders)
-
-1. In Google Drive, create a folder and upload audio files (`.mp3`, `.m4a`, etc.).
-2. For each audio file, set **Share → Anyone with the link → Viewer** (public access).
-3. For ease, make the containing folder shareable (so files inherit access).
-4. Create an API key in Google Cloud Console and **enable Drive API** for the project.
-
-> **Important:** If you see errors such as `API_KEY_SERVICE_BLOCKED` or `Requests to this API ... are blocked`, go to Google Cloud Console → APIs & Services → Library → enable *Google Drive API*. Check API key restrictions and enable Drive scope.
-
-### Where to put the API key
-
-* The app uses the API key to build public `alt=media` URLs. Place your API key in a safe config file or environment variable. Example:
-
-    * create `lib/config.dart` (not committed):
-
-      ```dart
-      const String kGoogleApiKey = 'YOUR_API_KEY';
-      ```
-    * Or use a `.env` approach and inject at runtime.
-* **Do not commit** API keys to public repos.
-
-### iOS background config
-
-* `ios/Runner/Info.plist` — add:
-
-  ```xml
-  <key>UIBackgroundModes</key>
-  <array>
-    <string>audio</string>
-  </array>
-  ```
-* In Xcode: Target → Signing & Capabilities → add **Background Modes** → enable **Audio, AirPlay & Picture in Picture**.
-
-### Android config
-
-* `android/app/src/main/AndroidManifest.xml` — add:
-
-  ```xml
-  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-  ```
-* The `audio_service` plugin handles much of the notification plumbing; the app initializes an `AudioHandler` with proper `AudioServiceConfig`.
-
----
-
-## 🧭 How to run
-
-1. Clone repo:
-
-   ```bash
-   git clone <repo-url>
-   cd audio-streaming-app
-   flutter pub get
-   ```
-2. Configure your API key (see above).
-3. Generate code (stacked / build\_runner) if needed:
-
-   ```bash
-   flutter pub run build_runner build --delete-conflicting-outputs
-   ```
-4. Run on device:
-
-   ```bash
-   flutter run
-   ```
-
-   For iOS, use Xcode if you need to set capabilities.
-
----
-
-## 🧪 Testing & common dev commands
-
-* Static analysis:
-
-  ```bash
-  flutter analyze
-  ```
-* Code gen:
-
-  ```bash
-  dart run build_runner build --delete-conflicting-outputs
-  ```
-* If using `stacked_cli` to generate views:
-
-  ```bash
-  flutter pub global activate stacked_cli
-  stacked create view home
-  ```
-
+## Contributing
+Issues and pull requests are welcome. Please follow the MVVM conventions already established in the codebase and update tests or documentation 
+when behaviour changes.
