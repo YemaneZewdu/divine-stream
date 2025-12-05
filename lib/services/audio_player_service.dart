@@ -161,19 +161,18 @@
 //   }
 // }
 
-import 'dart:developer';
-
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/app/app.locator.dart';
+import 'package:divine_stream/helpers/logger.dart';
 import 'package:divine_stream/models/audio_file.dart';
 import 'package:divine_stream/services/audio_cache_service.dart';
 import 'package:divine_stream/services/audio_handler_impl_service.dart';
 import 'package:divine_stream/services/connectivity_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:stacked/stacked_annotations.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 @LazySingleton()
 class AudioPlayerService {
@@ -197,7 +196,7 @@ class AudioPlayerService {
     final baseUrl = file.url;
     if (baseUrl.isEmpty) return baseUrl;
 
-    final apiKey = dotenv.env['GOOGLE_DRIVE_API_KEY'];
+    final apiKey = _driveApiKey();
     if (apiKey == null || apiKey.isEmpty) {
       return baseUrl;
     }
@@ -213,10 +212,27 @@ class AudioPlayerService {
       final params = Map<String, String>.from(uri.queryParameters);
       params['key'] = apiKey;
       final newUrl = uri.replace(queryParameters: params).toString();
-      log('[AudioPlayerService] Resolved playback URL for ${file.id}: $newUrl');
+      dsLog('[AudioPlayerService] Resolved playback URL for ${file.id} '
+          '-> ${_safeUrlForLog(newUrl)}');
       return newUrl;
     } catch (_) {
       return baseUrl;
+    }
+  }
+
+  String _safeUrlForLog(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return rawUrl;
+    final suffix = uri.hasQuery ? '?<redacted>' : '';
+    return '${uri.scheme}://${uri.host}${uri.path}$suffix';
+  }
+
+  String? _driveApiKey() {
+    try {
+      return dotenv.env['GOOGLE_DRIVE_API_KEY'];
+    } catch (_) {
+      // dotenv throws when not initialised; treat as missing key so Firebase URLs still work.
+      return null;
     }
   }
 
@@ -242,6 +258,8 @@ class AudioPlayerService {
     int startIndex = 0,
     required String playlistId,
   }) async {
+    dsLog('[AudioPlayerService] setPlaylist($playlistId) startIndex=$startIndex '
+        'tracks=${audioFiles.length} ready=$isReady');
     // Loading a remote playlist without connectivity causes confusing errors.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
@@ -252,6 +270,13 @@ class AudioPlayerService {
     _remoteUrls = [
       for (final file in audioFiles) _buildPlaybackUrl(file),
     ];
+
+    if (_remoteUrls.isNotEmpty) {
+      dsLog('[AudioPlayerService] First track source '
+          '${_safeUrlForLog(_remoteUrls.first)}');
+    } else {
+      dsLog('[AudioPlayerService] Playlist $playlistId has no track URLs to load');
+    }
 
     _mediaItems = [
       for (var i = 0; i < audioFiles.length; i++)
@@ -264,13 +289,20 @@ class AudioPlayerService {
         )
     ];
 
-    await (_handler as AudioHandlerImplService).loadPlaylist(_mediaItems);
-    await _handler.skipToQueueItem(startIndex);
+    try {
+      await (_handler as AudioHandlerImplService).loadPlaylist(_mediaItems);
+      await _handler.skipToQueueItem(startIndex);
+    } catch (e, st) {
+      dsLog('[AudioPlayerService] Failed to hand playlist $playlistId to handler',
+          error: e, stackTrace: st);
+      rethrow;
+    }
 
     _loadedPlaylistId = playlistId;
 
     await _prepareLocalAt(startIndex);
     _prefetchAround(startIndex + 1);
+    dsLog('[AudioPlayerService] Playlist $playlistId ready');
   }
 
   Future<void> play() => _handler.play();
@@ -284,7 +316,7 @@ class AudioPlayerService {
       return;
     }
     await _prepareLocalAt(index);
-    log('[AudioPlayerService] skipToIndex -> $index');
+    dsLog('[AudioPlayerService] skipToIndex -> $index');
     await _handler.skipToQueueItem(index);
     _prefetchAround(index + 1);
   }
@@ -298,7 +330,7 @@ class AudioPlayerService {
     final state = _handler.playbackState.value;
     final nextIndex = (state.queueIndex ?? 0) + 1;
     await _prepareLocalAt(nextIndex);
-    log('[AudioPlayerService] playNext requested');
+    dsLog('[AudioPlayerService] playNext requested');
     await _handler.skipToNext();
     _prefetchAround(nextIndex + 1);
   }
@@ -312,7 +344,7 @@ class AudioPlayerService {
     final state = _handler.playbackState.value;
     final previousIndex = (state.queueIndex ?? 0) - 1;
     await _prepareLocalAt(previousIndex);
-    log('[AudioPlayerService] playPrevious requested');
+    dsLog('[AudioPlayerService] playPrevious requested');
     await _handler.skipToPrevious();
   }
 

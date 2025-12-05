@@ -1,5 +1,6 @@
 import 'package:divine_stream/app/app.locator.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
+import 'package:divine_stream/helpers/logger.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/services/audio_player_service.dart';
 import 'package:divine_stream/services/playlist_service.dart';
@@ -48,6 +49,10 @@ class PlaylistViewModel extends BaseViewModel {
     tracks = p.audioFiles;
     // Default to the cached last played track; fall back to the first one.
     currentIndex = p.lastPlayedIndex() ?? 0;
+    final sampleSources = tracks.take(3).map((file) => _describeUrl(file.url));
+    // dsLog('[PlaylistViewModel] init ${p.id} "${p.name}" '
+    //     'tracks=${tracks.length} lastIndex=$currentIndex '
+    //     'sample=${sampleSources.join('; ')}');
     notifyListeners(); // show UI immediately
 
     // Listen for processing state to update isBusy:
@@ -63,6 +68,7 @@ class PlaylistViewModel extends BaseViewModel {
 
     // ✅ If the playlist is already loaded AND the player is ready, skip reloading
     if (_audioService.isPlaylistLoaded(p.id) && _audioService.isReady) {
+     dsLog('[PlaylistViewModel] Reusing in-memory playlist ${p.id}');
       _subscribeToStreams();
       // await _audioService.play();
       return;
@@ -73,6 +79,7 @@ class PlaylistViewModel extends BaseViewModel {
     // Loading audio from Firebase still requires connectivity; abort cleanly if offline.
     final online = await _connectivityService.ensureConnection();
     if (!online) {
+      dsLog('[PlaylistViewModel] Aborting init for ${p.id}: offline');
       setBusy(false);
       return;
     }
@@ -85,15 +92,29 @@ class PlaylistViewModel extends BaseViewModel {
         playlistId: playlist.id, // Preserve playlist identity for cache re-use.
       );
       //await _audioService.play();
-    } catch (e) {
-      print(e.toString());
+    } catch (e, st) {
+      final summary = Helpers.shorten(e.toString());
+      dsLog('[PlaylistViewModel] Failed to load playlist ${playlist.id} '
+          '(${tracks.length} tracks): $summary',
+          error: e,
+          stackTrace: st);
       setBusy(false);
-      Helpers.showToast("Please try again in playlist vm");
+      Helpers.showToast('Unable to load playlist. $summary');
+      return;
     }
 
+    dsLog('[PlaylistViewModel] Playlist ${playlist.id} loaded. Attaching streams.');
     _subscribeToStreams();
 
     setBusy(false);
+  }
+
+  String _describeUrl(String rawUrl) {
+    if (rawUrl.isEmpty) return '<empty>';
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return rawUrl;
+    final suffix = uri.hasQuery ? '?<redacted>' : '';
+    return '${uri.scheme}://${uri.host}${uri.path}$suffix';
   }
 
   void _subscribeToStreams() {

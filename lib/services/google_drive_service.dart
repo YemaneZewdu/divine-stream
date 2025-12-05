@@ -6,13 +6,19 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../utils/sort_audio_files.dart';
 
 class GoogleDriveService {
-  final api_key = dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
+  String get _apiKey {
+    try {
+      return dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 
   /// Fetch direct subfolders under a given parent folder
   Future<List<Map<String, dynamic>>> fetchSubFolders(
       String parentFolderId) async {
     final url =
-        "https://www.googleapis.com/drive/v3/files?q='$parentFolderId'+in+parents+and+mimeType='application/vnd.google-apps.folder'&fields=files(id,name)&key=$api_key";
+        "https://www.googleapis.com/drive/v3/files?q='$parentFolderId'+in+parents+and+mimeType='application/vnd.google-apps.folder'&fields=files(id,name)&key=$_apiKey";
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {
@@ -40,7 +46,7 @@ class GoogleDriveService {
       {
         'q': query,
         'fields': 'files(id,name,webContentLink)',
-        'key': api_key,
+        'key': _apiKey,
       },
     ).toString();
 
@@ -97,7 +103,7 @@ class GoogleDriveService {
   /// Fetch folder metadata (e.g., name)
   Future<Map<String, dynamic>> fetchFolderInfo(String folderId) async {
     final url =
-        "https://www.googleapis.com/drive/v3/files/$folderId?fields=id,name&key=$api_key";
+        "https://www.googleapis.com/drive/v3/files/$folderId?fields=id,name&key=$_apiKey";
 
     final response = await http.get(Uri.parse(url));
     if (response.statusCode == 200) {

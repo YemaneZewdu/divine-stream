@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:divine_stream/helpers/logger.dart';
 import 'package:divine_stream/models/audio_file.dart';
 import 'package:divine_stream/models/playlist.dart';
 import 'package:divine_stream/utils/sort_audio_files.dart';
@@ -48,15 +49,18 @@ class FirebasePlaylistLoader {
         parentName ??= parentId;
       }
 
-      playlists.add(
-        Playlist(
-          id: doc.id,
-          name: playlistName,
-          audioFiles: tracks,
-          parentFolderId: parentId,
-          parentFolderName: parentName,
-        ),
+      final playlist = Playlist(
+        id: doc.id,
+        name: playlistName,
+        audioFiles: tracks,
+        parentFolderId: parentId,
+        parentFolderName: parentName,
       );
+      playlists.add(playlist);
+
+      final sampleUrl = tracks.isEmpty ? '<none>' : _describeUrl(tracks.first.url);
+      // dsLog('[FirebasePlaylistLoader] ${playlist.id} -> ${tracks.length} tracks '
+      //     'sample=$sampleUrl');
     }
 
     playlists.sort((a, b) => numericAwareNameCompare(a.name, b.name));
@@ -71,4 +75,12 @@ String _stripExtension(String name) {
     return name;
   }
   return name.substring(0, index);
+}
+
+String _describeUrl(String rawUrl) {
+  if (rawUrl.isEmpty) return '<empty>';
+  final uri = Uri.tryParse(rawUrl);
+  if (uri == null) return rawUrl;
+  final suffix = uri.hasQuery ? '?<redacted>' : '';
+  return '${uri.scheme}://${uri.host}${uri.path}$suffix';
 }

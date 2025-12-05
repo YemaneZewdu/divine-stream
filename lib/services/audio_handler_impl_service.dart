@@ -1,7 +1,6 @@
-import 'dart:developer';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:divine_stream/helpers/app_helpers.dart';
+import 'package:divine_stream/helpers/logger.dart';
 import 'package:just_audio/just_audio.dart';
 
 class AudioHandlerImplService extends BaseAudioHandler
@@ -54,13 +53,16 @@ class AudioHandlerImplService extends BaseAudioHandler
   ///  Seed just_audio with remote URLs first;
   ///  cached swaps will replace them lazily
   Future<void> loadPlaylist(List<MediaItem> items) async {
+    if (items.isEmpty) {
+      dsLog('[AudioHandler] loadPlaylist called with no media items');
+      throw StateError('Playlist contains no playable tracks');
+    }
     _mediaItems = items;
     queue.add(items); // tell the system what’s in the queue
 
     // DEBUG: print each URL
     for (var item in items) {
-      log(' loadPlaylist URL: ${item.id}');
-      log('AudioHandler loading ${item.id}');
+      dsLog('[AudioHandler] Queue item -> ${_safeUrlForLog(item.id)}');
     }
 
     final sources =
@@ -68,11 +70,30 @@ class AudioHandlerImplService extends BaseAudioHandler
     _playlist.clear();
     _playlist.addAll(sources);
 
-    log('\n››› Setting audio source');
-    await _player.setAudioSource(_playlist);
+    dsLog('[AudioHandler] Setting ConcatenatingAudioSource (${items.length} entries)');
+    try {
+      await _player.setAudioSource(_playlist);
+    } on PlayerException catch (e, st) {
+      dsLog('[AudioHandler] Failed to set audio source: ${e.message}',
+          error: e,
+          stackTrace: st);
+      rethrow;
+    } catch (e, st) {
+      dsLog('[AudioHandler] Unexpected error while setting audio source',
+          error: e,
+          stackTrace: st);
+      rethrow;
+    }
     mediaItem.add(_mediaItems[0]);
     // Let the caller decide when to start playback so we can seek to the saved
     // track index first; auto-play happens via view model after skipToQueueItem.
+  }
+
+  String _safeUrlForLog(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return rawUrl;
+    final suffix = uri.hasQuery ? '?<redacted>' : '';
+    return '${uri.scheme}://${uri.host}${uri.path}$suffix';
   }
 
   // Swap the underlying audio source for a queue item so we can point at a

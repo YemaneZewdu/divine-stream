@@ -9,7 +9,13 @@ import 'package:http/http.dart' as http;
 class DrivePermissionService {
   DrivePermissionService();
 
-  String get _apiKey => dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
+  String get _apiKey {
+    try {
+      return dotenv.env['GOOGLE_DRIVE_API_KEY'] ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 
   /// Returns true when the given folder ID responds with metadata using our
   /// public API key. Shows a toast when Google Drive denies access.
